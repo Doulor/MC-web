@@ -1,0 +1,11 @@
+{
+    "smtp_host": "",
+    "smtp_port": "587",
+    "smtp_user": "",
+    "smtp_pass": "",
+    "smtp_from_email": "",
+    "smtp_from_name": "FoxMC Admin",
+    "dnd_mode": false,
+    "reply_email_template": "亲爱的 {name}，<\/br>\n\n您好！<\/br>\n\n我们已收到您关于「{subject}」的反馈，以下是我们的回复：<\/br>\n\n{reply_content}<\/br>\n\n如有其他问题，欢迎随时联系我们。<\/br>\n\n此致<\/br>\nFoxMC 管理团队",
+    "admin_pass_hash": "$2y$10$g76WpC4nxKfQHhWVCuadVeCYyJZYBSijOLmpHj5q.odBxEeKn6Eki"
+}
