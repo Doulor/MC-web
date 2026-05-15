@@ -10,7 +10,11 @@
  */
 
 const OPANEL_BASE = 'http://mc-web-api.doulor.cn:30000';
-const MAP_BASE = 'http://firef.cc.cd:22225';
+// 使用直接 IP 地址而非域名，避免 Cloudflare 代理循环导致 "无效的响应" 错误
+// firef.cc.cd 解析到 13.75.68.60 (Azure)，如果域名开启了 Cloudflare 代理（橙色云），
+// Worker 通过域名请求会导致 Cloudflare 内部路由冲突
+const MAP_BASE = 'http://13.75.68.60:22225';
+const MAP_DOMAIN = 'firef.cc.cd:22225';
 
 const ROUTES = {
   '/players.php': {
@@ -124,6 +128,7 @@ export default {
 
 /**
  * 代理 Pl3xMap 地图请求
+ * 自动重写 HTML/JS/CSS 中的绝对 URL，确保通过 Worker 代理加载所有资源
  */
 async function proxyMapRequest(request, mapUrl) {
   try {
@@ -138,7 +143,8 @@ async function proxyMapRequest(request, mapUrl) {
         'Accept': request.headers.get('Accept') || '*/*',
         'Accept-Encoding': request.headers.get('Accept-Encoding') || 'gzip, deflate',
         'Accept-Language': request.headers.get('Accept-Language') || 'zh-CN,zh;q=0.9',
-        'Referer': MAP_BASE + '/'
+        'Referer': MAP_BASE + '/',
+        'Host': MAP_DOMAIN
       },
       signal: controller.signal
     });
@@ -173,6 +179,50 @@ async function proxyMapRequest(request, mapUrl) {
       }
     }
 
+    // 获取响应内容类型
+    const contentType = response.headers.get('content-type') || '';
+
+    // 对于 HTML、JS、CSS 等文本内容，重写绝对 URL 为代理 URL
+    if (contentType.includes('text/html') || contentType.includes('text/javascript') || 
+        contentType.includes('application/javascript') || contentType.includes('text/css') ||
+        contentType.includes('application/json')) {
+      
+      let text = await response.text();
+      
+      // 重写 Pl3xMap 中常见的绝对 URL 模式
+      // 1. http://firef.cc.cd:22225/... -> /map/...
+      text = text.replace(/https?:\/\/firef\.cc\.cd:22225\//g, '/map/');
+      text = text.replace(/https?:\/\/firef\.cc\.cd:22225/g, '/map');
+      
+      // 2. 重写 IP 地址 URL http://13.75.68.60:22225/... -> /map/...
+      text = text.replace(/https?:\/\/13\.75\.68\.60:22225\//g, '/map/');
+      text = text.replace(/https?:\/\/13\.75\.68\.60:22225/g, '/map');
+      
+      // 3. 重写协议相对 URL //firef.cc.cd:22225/... -> /map/...
+      text = text.replace(/\/\/firef\.cc\.cd:22225\//g, '/map/');
+      text = text.replace(/\/\/firef\.cc\.cd:22225/g, '/map');
+      
+      // 4. 重写协议相对 IP URL //13.75.68.60:22225/... -> /map/...
+      text = text.replace(/\/\/13\.75\.68\.60:22225\//g, '/map/');
+      text = text.replace(/\/\/13\.75\.68\.60:22225/g, '/map');
+      
+      // 5. 重写可能存在的绝对路径引用（如 /tiles/... 但需要确保是地图相关路径）
+      // 注意：不要重写站点自身的路径
+      
+      // 6. 如果 HTML 中有 base 标签，确保它指向代理路径
+      if (contentType.includes('text/html')) {
+        // 在 </head> 前插入 base 标签，确保所有相对 URL 正确解析
+        text = text.replace('</head>', '<base href="/map/"></head>');
+      }
+
+      return new Response(text, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: responseHeaders
+      });
+    }
+
+    // 对于二进制内容（图片、字体等），直接转发
     return new Response(response.body, {
       status: response.status,
       statusText: response.statusText,
@@ -192,7 +242,8 @@ async function proxyMapRequest(request, mapUrl) {
       '<h1>🗺️ 地图加载失败</h1>' +
       '<p>无法连接到地图服务器 (firef.cc.cd:22225)</p>' +
       '<div class="detail">' + escapeHtml(errorMessage) + '</div>' +
-      '<p style="margin-top:20px;font-size:12px;color:#64748b">请稍后刷新页面重试，或联系管理员检查地图服务状态</p>' +
+      '<p style="margin-top:20px;font-size:12px;color:#64748b">请检查地图服务器是否正常运行，或联系管理员</p>' +
+      '<p style="margin-top:10px;font-size:12px;color:#64748b">提示：如果地图服务器在本地网络，请确保其可通过公网访问</p>' +
       '</div></body></html>',
       {
         status: 502,
@@ -323,7 +374,7 @@ async function loadEnvInfo() {
 }
 
 async function testEndpoint(endpoint) {
-  var btns = document.querySelectorAll('#testButtons .btn');
+  var btns = document.quewdsjctorAll('#testButtons .btn');
   btns.forEach(function(b) { b.disabled = true; });
 
   var resultsEl = document.getElementById('testResults');
