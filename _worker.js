@@ -77,6 +77,11 @@ export default {
       return handleApiTestWithHost(request);
     }
 
+    // 详细诊断 - 显示完整响应头
+    if (path === '/api-test-debug') {
+      return handleApiTestDebug(request);
+    }
+
     // Contact form submission
     if (path === '/submit_message.php') {
       return handleContactForm(request, env);
@@ -704,6 +709,59 @@ async function handleApiProxy(request, route) {
     return jsonResponse({
       success: false,
       message: '查询失败: ' + errorMessage
+    });
+  }
+}
+
+/**
+ * 详细诊断 - 显示完整响应头和原始响应体
+ */
+async function handleApiTestDebug(request) {
+  const url = new URL(request.url);
+  const endpoint = url.searchParams.get('endpoint') || '/open-api/info';
+  const apiUrl = OPANEL_BASE + endpoint;
+  const startTime = Date.now();
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+    const response = await fetch(apiUrl, {
+      headers: { 'User-Agent': 'MC-web-Worker-Diagnostic/1.0' },
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+    const elapsed = Date.now() - startTime;
+
+    // 收集所有响应头
+    const responseHeaders = {};
+    response.headers.forEach((value, key) => {
+      responseHeaders[key] = value;
+    });
+
+    // 读取原始响应体（不限格式）
+    const rawBody = await response.text();
+    const contentType = response.headers.get('Content-Type') || '';
+
+    return jsonResponse({
+      success: response.ok,
+      httpStatus: response.status,
+      statusText: response.statusText,
+      elapsed: elapsed,
+      headers: responseHeaders,
+      contentType: contentType,
+      bodyPreview: rawBody.substring(0, 2000),
+      bodyLength: rawBody.length
+    });
+  } catch (error) {
+    const elapsed = Date.now() - startTime;
+    return jsonResponse({
+      success: false,
+      httpStatus: 'N/A',
+      elapsed: elapsed,
+      error: error.message,
+      errorType: error.name === 'AbortError' ? 'timeout' : 'network_error'
     });
   }
 }
