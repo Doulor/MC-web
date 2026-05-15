@@ -9,7 +9,7 @@
  * 5. 其他请求正常返回静态文件
  */
 
-const OPANEL_BASE = 'http://mc-web-api.doulor.cn:30000';
+const OPANEL_BASE = 'http://39.97.183.32:30000';
 // 地图服务器配置
 // firef.cc.cd:22225 托管于 Azure，解析到 13.75.68.60
 // 注意：如果 firef.cc.cd 开启了 Cloudflare 代理（橙色云），Worker 无法通过域名直连
