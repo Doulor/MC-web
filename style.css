@@ -90,7 +90,7 @@ ul { list-style: none; }
 /* Hero Section */
 .hero {
     position: relative; height: 100vh; width: 100%;
-    background: url('./png/c6d2dd6a664242e2e5faa640d28c340b.jpg');
+    background: url('./png/2025-10-09_13.22.19.jpg');
     background-size: cover; background-position: center;
     display: flex; align-items: center; overflow: hidden;
 }
