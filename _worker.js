@@ -156,16 +156,17 @@ h1{font-size:24px;margin-bottom:8px;color:#f1f5f9}
 </div>
 
 <div class="tips">
-<h3>💡 已检测到问题：服务器返回 <strong style="color:#fb923c;">HTTP 403 Forbidden</strong></h3>
+<h3>💡 已检测到问题：阿里云内网穿透返回 <strong style="color:#fb923c;">HTTP 403 Forbidden</strong></h3>
 <p style="color:#bfdbfe;font-size:13px;margin-top:8px;line-height:1.6;">
-你的 oPanel 服务器 <strong>可以连通</strong>（响应时间正常），但服务器<strong>主动拒绝了</strong>来自 Cloudflare 的请求。<br><br>
-<strong>最可能的原因：</strong>oPanel 服务（或服务器防火墙）配置了 <strong>IP 白名单</strong>，只允许特定 IP 地址访问。你本地的 IP 可以访问，但 Cloudflare Worker 的出口 IP 不在白名单中。<br><br>
+你的架构是：家用服务器 → 阿里云内网穿透 → 公网 IP :30000 → Cloudflare Worker<br><br>
+<strong>可以连通</strong>（响应时间正常），但 <strong>阿里云内网穿透服务</strong> 主动拒绝了 Cloudflare 的请求。<br><br>
+<strong>原因：</strong>阿里云的内网穿透服务（或 ECS 安全组/ NAT 网关）有 <strong>IP 白名单 / 安全组规则</strong>，只允许特定 IP 访问 39.97.183.32:30000。你本地能访问，但 Cloudflare Worker 的出口 IP 不在允许列表中。<br><br>
 <strong>解决方案：</strong>
 </p>
 <ul>
-<li><strong>方案一（推荐）：</strong>在 oPanel 服务器（或服务器防火墙/安全组）中，将 <a href="https://www.cloudflare.com/ips/" target="_blank" style="color:#60a5fa;">Cloudflare IP 范围</a> 添加到白名单。</li>
-<li><strong>方案二：</strong>在 oPanel 的配置文件中，找到 IP 白名单设置，添加 Cloudflare 的 IP 段。</li>
-<li><strong>方案三：</strong>如果 oPanel 不支持 IP 白名单配置，可以暂时关闭 IP 限制，或使用 Cloudflare Tunnel 替代直接连接。</li>
+<li><strong>方案一（推荐）：</strong>登录阿里云控制台，找到<strong>安全组</strong>或<strong>NAT 网关</strong>配置，添加入方向规则，允许 <a href="https://www.cloudflare.com/ips/" target="_blank" style="color:#60a5fa;">Cloudflare IP 范围</a> 访问端口 30000。</li>
+<li><strong>方案二：</strong>如果内网穿透用的是 frp 或其他隧道工具，在 frp 服务端配置文件（frps.ini）中关闭 IP 白名单限制，或添加 Cloudflare 的 IP 段。</li>
+<li><strong>方案三（推荐）：</strong>改用 <strong>Cloudflare Tunnel</strong>（cloudflared），在家用服务器上运行 cloudflared，直接建立隧道到 Cloudflare，无需公网 IP，安全性更高且不存在白名单问题。</li>
 </ul>
 </div>
 
@@ -293,14 +294,12 @@ function updateDiagnosis() {
     conclusion += 'Cloudflare Worker 可以正常连接到 oPanel API。如果前端页面仍然显示"加载失败"，请尝试清除浏览器缓存。';
   } else if (forbiddenCount > 0) {
     cls = 'forbidden';
-    conclusion = '<strong>🚫 所有请求被服务器拒绝访问 (HTTP 403)</strong><br><br>';
-    conclusion += '<strong>问题原因：</strong>oPanel 服务器拒绝了来自 Cloudflare Worker 的请求。这通常是因为 oPanel 服务器配置了 <strong>IP 白名单</strong>，只允许特定 IP 地址访问。';
+    conclusion = '<strong>🚫 请求被阿里云内网穿透服务拒绝 (HTTP 403)</strong><br><br>';
+    conclusion += '<strong>问题原因：</strong>阿里云内网穿透（或 ECS 安全组 / NAT 网关）拒绝了来自 Cloudflare Worker 的请求。家用服务器上的 oPanel 本身可能没有 IP 限制，但阿里云侧的<strong>安全组规则</strong>或<strong>frp 服务端配置</strong>只允许特定 IP 访问端口 30000。';
     conclusion += '<br><br><strong>解决步骤：</strong><br>';
-    conclusion += '1. 登录到 oPanel 服务器（通过 SSH 或服务器管理面板）<br>';
-    conclusion += '2. 找到 oPanel 的配置文件，通常位于 oPanel 安装目录下<br>';
-    conclusion += '3. 查找 IP 白名单配置项<br>';
-    conclusion += '4. 添加 Cloudflare 的 IP 范围：<a href="https://www.cloudflare.com/ips/" target="_blank" style="color:#60a5fa;">https://www.cloudflare.com/ips/</a><br><br>';
-    conclusion += '如果找不到 IP 白名单配置，请检查服务器防火墙（如 iptables、firewalld）或云服务商的安全组设置。';
+    conclusion += '1. <strong>如果用的是阿里云安全组：</strong>登录阿里云控制台 → 找到 ECS 实例 → 安全组 → 添加入方向规则，放行 <a href="https://www.cloudflare.com/ips/" target="_blank" style="color:#60a5fa;">Cloudflare IP 范围</a> 的端口 30000<br><br>';
+    conclusion += '2. <strong>如果用的是 frp 内网穿透：</strong>在 frp 服务端（frps.ini）中，检查是否有 <code>allow_ips</code> 或 <code>white_list</code> 配置，添加 Cloudflare IP 段，或直接注释掉该配置以允许所有来源<br><br>';
+    conclusion += '3. <strong>推荐方案：改用 Cloudflare Tunnel（cloudflared）</strong>，在家用服务器上直接运行 cloudflared 创建隧道，无需阿里云穿透，无 IP 白名单问题';
   } else if (timeoutCount > 0) {
     cls = 'error';
     conclusion = '<strong>⚠️ 存在连接超时</strong><br><br>';
