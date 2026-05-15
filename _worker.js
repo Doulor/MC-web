@@ -140,17 +140,21 @@ async function proxyMapRequest(request, mapUrl) {
     const timeoutId = setTimeout(() => controller.abort(), 15000);
 
     // 转发请求到地图服务器，保留原始请求头（如 Accept-Encoding）
-    // 使用 IP 地址直接访问，并设置正确的 Host 头，避免 Cloudflare 代理循环
+    // 使用 IP 地址直接访问。为了避免 Cloudflare 对被代理域名的直接访问返回 1003，
+    // 我们在 Host 头中使用 MAP_BASE 的 host（通常为 IP:port），而不是 MAP_DOMAIN（可能是被 Cloudflare 代理的域）。
+    const originHost = (new URL(MAP_BASE)).host;
+    const forwardedHeaders = {
+      'User-Agent': 'MC-web-Worker-Map-Proxy/1.0',
+      'Accept': request.headers.get('Accept') || '*/*',
+      'Accept-Encoding': request.headers.get('Accept-Encoding') || 'gzip, deflate',
+      'Accept-Language': request.headers.get('Accept-Language') || 'zh-CN,zh;q=0.9',
+      'Referer': MAP_BASE + '/',
+      'Host': originHost
+    };
+
     const response = await fetch(mapUrl, {
       method: request.method,
-      headers: {
-        'User-Agent': 'MC-web-Worker-Map-Proxy/1.0',
-        'Accept': request.headers.get('Accept') || '*/*',
-        'Accept-Encoding': request.headers.get('Accept-Encoding') || 'gzip, deflate',
-        'Accept-Language': request.headers.get('Accept-Language') || 'zh-CN,zh;q=0.9',
-        'Referer': MAP_BASE + '/',
-        'Host': MAP_DOMAIN
-      },
+      headers: forwardedHeaders,
       signal: controller.signal
     });
 
