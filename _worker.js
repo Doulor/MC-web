@@ -5,10 +5,12 @@
  * 1. 代理 oPanel API 请求到后端服务器（替代原来的 PHP 代理）
  * 2. 处理联系表单提交，通过 Resend API 发送邮件
  * 3. 诊断工具 - 排查 oPanel API 连接问题
- * 4. 其他请求正常返回静态文件
+ * 4. 代理 Pl3xMap 地图请求（通过域名 firef.cc.cd:22225）
+ * 5. 其他请求正常返回静态文件
  */
 
 const OPANEL_BASE = 'http://mc-web-api.doulor.cn:30000';
+const MAP_BASE = 'http://firef.cc.cd:22225';
 
 const ROUTES = {
   '/players.php': {
@@ -92,6 +94,19 @@ export default {
       return handlePlayerDetail(request, url);
     }
 
+    // Map proxy - 代理 Pl3xMap 地图请求（通过域名 firef.cc.cd:22225）
+    if (path === '/map' || path === '/map/') {
+      // Redirect /map or /map/ to /map/index.html
+      const mapUrl = MAP_BASE + '/index.html';
+      return proxyMapRequest(request, mapUrl);
+    }
+    if (path.startsWith('/map/')) {
+      // 代理 /map/* 到 MAP_BASE + /*
+      const subPath = path.substring(5); // 去掉 "/map"
+      const mapUrl = MAP_BASE + subPath + url.search;
+      return proxyMapRequest(request, mapUrl);
+    }
+
     // Other API routes
     const route = ROUTES[path];
     if (route) {
@@ -106,6 +121,89 @@ export default {
     }
   }
 };
+
+/**
+ * 代理 Pl3xMap 地图请求
+ */
+async function proxyMapRequest(request, mapUrl) {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+    // 转发请求到地图服务器，保留原始请求头（如 Accept-Encoding）
+    const response = await fetch(mapUrl, {
+      method: request.method,
+      headers: {
+        'User-Agent': 'MC-web-Worker-Map-Proxy/1.0',
+        'Accept': request.headers.get('Accept') || '*/*',
+        'Accept-Encoding': request.headers.get('Accept-Encoding') || 'gzip, deflate',
+        'Accept-Language': request.headers.get('Accept-Language') || 'zh-CN,zh;q=0.9',
+        'Referer': MAP_BASE + '/'
+      },
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    // 构建响应，保留内容类型和缓存控制
+    const responseHeaders = new Headers({
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'X-Content-Type-Options': 'nosniff'
+    });
+
+    // 传递重要的响应头
+    const passHeaders = ['content-type', 'content-length', 'cache-control', 'last-modified', 'etag'];
+    for (const header of passHeaders) {
+      const value = response.headers.get(header);
+      if (value) {
+        responseHeaders.set(header, value);
+      }
+    }
+
+    // 地图瓦片可以缓存较长时间（如 1 小时），静态资源可以缓存更久
+    if (!responseHeaders.has('cache-control')) {
+      const contentType = response.headers.get('content-type') || '';
+      if (contentType.includes('image/') || contentType.includes('tile')) {
+        responseHeaders.set('cache-control', 'public, max-age=3600');
+      } else if (contentType.includes('javascript') || contentType.includes('css') || contentType.includes('font')) {
+        responseHeaders.set('cache-control', 'public, max-age=86400');
+      } else {
+        responseHeaders.set('cache-control', 'public, max-age=300');
+      }
+    }
+
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: responseHeaders
+    });
+  } catch (error) {
+    const errorMessage = error.message || String(error);
+    return new Response(
+      '<!DOCTYPE html><html><head><meta charset="utf-8"><title>地图加载失败</title>' +
+      '<style>body{font-family:sans-serif;background:#0f172a;color:#e2e8f0;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;text-align:center}' +
+      '.error-box{max-width:500px;padding:40px}' +
+      'h1{font-size:24px;color:#f87171;margin-bottom:16px}' +
+      'p{color:#94a3b8;font-size:14px;line-height:1.6}' +
+      '.detail{background:#1e293b;border:1px solid #334155;border-radius:8px;padding:12px;margin-top:16px;font-family:monospace;font-size:12px;color:#f87171}' +
+      '</style></head><body>' +
+      '<div class="error-box">' +
+      '<h1>🗺️ 地图加载失败</h1>' +
+      '<p>无法连接到地图服务器 (firef.cc.cd:22225)</p>' +
+      '<div class="detail">' + escapeHtml(errorMessage) + '</div>' +
+      '<p style="margin-top:20px;font-size:12px;color:#64748b">请稍后刷新页面重试，或联系管理员检查地图服务状态</p>' +
+      '</div></body></html>',
+      {
+        status: 502,
+        headers: {
+          'Content-Type': 'text/html; charset=utf-8',
+          'Cache-Control': 'no-cache'
+        }
+      }
+    );
+  }
+}
 
 /**
  * 诊断页面 - HTML

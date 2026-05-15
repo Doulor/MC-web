@@ -218,7 +218,7 @@ foreach ($messages as $m) {
                         <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;">上传图片后将替换默认文字 LOGO；清空图片则恢复为文字显示。</p>
                         <div class="form-group">
                             <label>LOGO 文字（默认显示）</label>
-                            <input type="text" name="site[logo_text]" value="<?= e($content['site']['logo_text'] ?? '我的世界服务器') ?>" class="form-input" placeholder="我的世界服务器">
+                            <input type="text" name="site[logo_text]" value="<?= e($content['site']['logo_text'] ?? 'Firefly荧烛服务器') ?>" class="form-input" placeholder="Firefly荧烛服务器">
                         </div>
                         <div class="form-group">
                             <label>LOGO 图片（可选，优先于文字）</label>
