@@ -16,9 +16,9 @@ const OPANEL_BASE = 'http://mc-web-api.doulor.cn:30000';
 // 备选方案：使用 IP 地址直接访问 (http://13.75.68.60:22225) 并设置 Host 头
 // 当前使用域名，需要确保 firef.cc.cd:22225 未经过 Cloudflare 代理
 const MAP_BASE = 'http://13.75.68.60:22225';
-// Use the hostname (without port) for the Host header. If your frp/http routing requires the port in Host,
-// you can change this to 'firef.cc.cd:22225'.
-const MAP_DOMAIN = 'firef.cc.cd';
+// Use the hostname (with port if required) for the Host header. For frp/http routing that expects the port
+// include it here (common cause of 403). We set the port-included host so the origin/frp will accept the request.
+const MAP_DOMAIN = 'firef.cc.cd:22225';
 
 const ROUTES = {
   '/players.php': {
@@ -186,6 +186,13 @@ async function proxyMapRequest(request, mapUrl) {
 
     // 获取响应内容类型
     const contentType = response.headers.get('content-type') || '';
+
+    // If origin responds 403, surface the response headers/body snippet to help debugging
+    if (response.status === 403) {
+      const snippet = (contentType.includes('text') || contentType.includes('json')) ? (await response.text()).slice(0,2000) : '';
+      const hdrs = Array.from(response.headers.entries()).map(([k,v])=>`${k}: ${v}`).join('\n');
+      return new Response(`<!doctype html><html><body><h1>Origin returned 403</h1><pre>${escapeHtml(hdrs)}</pre><h2>Body snippet</h2><pre>${escapeHtml(snippet)}</pre></body></html>`, { status: 403, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+    }
 
     // 对于 HTML、JS、CSS 等文本内容，重写绝对 URL 为代理 URL
     if (contentType.includes('text/html') || contentType.includes('text/javascript') || 
