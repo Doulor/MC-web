@@ -20,7 +20,7 @@ const MAP_BASE = 'http://13.75.68.60:22225';
 // proxy for that record (DNS-only / gray cloud), set MAP_ORIGIN_DNS to that hostname. The worker will then
 // use that hostname in the Host header when fetching the origin, avoiding Cloudflare's proxy checks (error 1003).
 // Example: MAP_ORIGIN_DNS = 'origin.firef.cc.cd';
-const MAP_ORIGIN_DNS = '';
+const MAP_ORIGIN_DNS = 'origin.firef.cc.cd';
 
 // Use the hostname (with port if required) for the Host header when necessary. MAP_DOMAIN is the public
 // domain name you might have used for the map (can be proxied). MAP_ORIGIN_DNS takes precedence if set.
