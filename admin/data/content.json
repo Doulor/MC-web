@@ -59,7 +59,7 @@
             {
                 "title": "加入QQ群",
                 "desc": "我们需要加入QQ群并绑定账号才能进入服务器。点击下方按钮加入QQ群。",
-                "link_text": "加入QQ群 (Minecraft_𝓕𝒾𝓇𝓮𝓯𝓵𝔂)",
+                "link_text": "加入QQ群",
                 "link_url": "https:\/\/qm.qq.com\/q\/PjxurIGsQC"
             },
             {
@@ -109,16 +109,12 @@
                 "caption": "精美的玩家建筑"
             },
             {
+                "src": ".\/png\/img2_ab032cdc.jpg",
+                "caption": "激情的PVP对战"
+            },
+            {
                 "src": ".\/png\/9cca3afcca8c0a79eac6a39aad5d65ec.jpg",
                 "caption": "广阔的生存世界"
-            },
-            {
-                "src": ".\/egg\/img1_bcd004c0.jpg",
-                "caption": "热闹的活动现场"
-            },
-            {
-                "src": ".\/egg\/img2_ab032cdc.jpg",
-                "caption": "激情的PVP对战"
             }
         ]
     },
@@ -129,36 +125,36 @@
         "members": [
             {
                 "name": "服主",
-                "role": "Server Owner",
+                "role": "Doulor",
                 "desc": "负责服务器整体规划与运营，确保服务器长期稳定运行。",
                 "avatar": ".\/egg\/cat.jpg",
-                "contact_link": ""
+                "contact_link": "https:\/\/www.doulor.cn"
             },
             {
-                "name": "技术管理",
-                "role": "Technical Admin",
-                "desc": "负责插件配置、Bug修复及服务器性能优化。",
+                "name": "吉祥物",
+                "role": "TinaYa_",
+                "desc": "建造了服务器最大和最早的基地，建造了一系列机器。",
                 "avatar": ".\/egg\/cat2.jpg",
                 "contact_link": ""
             },
             {
-                "name": "社区巡查",
-                "role": "Moderator",
-                "desc": "维护游戏秩序，处理玩家纠纷，营造良好社区氛围。",
+                "name": "技术大佬",
+                "role": "Trystage4C01",
+                "desc": "建造了末地小黑塔，梯田农场等一系列建筑，编写了服务器翻译插件的初版形态。",
                 "avatar": ".\/egg\/cat3.jpg",
                 "contact_link": ""
             },
             {
-                "name": "建筑师",
-                "role": "Builder",
-                "desc": "负责主城及公共设施的建筑设计与搭建。",
+                "name": "笨蛋",
+                "role": "Determinates",
+                "desc": "搭建了村民交易所，但是是笨蛋",
                 "avatar": ".\/egg\/dsb.JPG",
                 "contact_link": ""
             },
             {
-                "name": "外挂巡查",
-                "role": "Externals",
-                "desc": "专门负责巡查玩家是否使用外挂，确保游戏公平性。",
+                "name": "生存大佬",
+                "role": "KlaterGaming",
+                "desc": "建造了掠夺者农场，刷铁机等机器",
                 "avatar": ".\/egg\/dsb2.jpg",
                 "contact_link": ""
             }
@@ -172,8 +168,8 @@
         "qq_desc": "与其他玩家实时交流，获取最新公告",
         "qq_qr": "",
         "qq_link": "https:\/\/qm.qq.com\/q\/vaKbztTAFc",
-        "wechat_text": "微信交流群",
-        "wechat_desc": "关注微信群，不错过任何活动通知",
+        "wechat_text": "Discord服务器",
+        "wechat_desc": "关注Discord，不错过任何活动通知",
         "wechat_qr": "",
         "wechat_link": "#"
     },
@@ -186,12 +182,12 @@
                 "url": "https:\/\/www.doulor.cn\/"
             },
             {
-                "name": "我的世界国际服",
-                "url": "https:\/\/www.minecraft.net\/"
+                "name": "服主博客",
+                "url": "https:\/\/blog.doulor.cn\/"
             },
             {
-                "name": "我不知道写什么了",
-                "url": "#"
+                "name": "我的世界国际服",
+                "url": "https:\/\/www.minecraft.net\/"
             }
         ]
     }

@@ -59,7 +59,7 @@ foreach ($messages as $m) {
         <div class="sidebar-header">
             <div class="sidebar-logo">
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4H20V20H4V4Z"/><path d="M4 12H20"/><path d="M12 4V20"/></svg>
-                <span class="sidebar-title">FoxMC 后台</span>
+                <span class="sidebar-title">Firefly荧烛 后台</span>
             </div>
         </div>
         <nav class="sidebar-nav">

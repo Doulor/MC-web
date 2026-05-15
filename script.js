@@ -87,8 +87,8 @@ document.addEventListener('DOMContentLoaded', () => {
         { src: "./png/f5ea0ca06bf5ac36704b7277536ab53d.jpg", desc: "宏伟的主城大厅" },
         { src: "./png/5e1e1be033cbd911e62327519886379f.jpg", desc: "精美的玩家建筑" },
         { src: "./png/9cca3afcca8c0a79eac6a39aad5d65ec.jpg", desc: "广阔的生存世界" },
-        { src: "./egg/img1_bcd004c0.jpg", desc: "热闹的活动现场" },
-        { src: "./egg/img2_ab032cdc.jpg", desc: "激情的PVP对战" }
+        { src: "./png/img1_bcd004c0.jpg", desc: "热闹的活动现场" },
+        { src: "./png/img2_ab032cdc.jpg", desc: "激情的PVP对战" }
     ];
 
     let currentImageIndex = 0;
@@ -249,7 +249,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         safeText($('.hero-subtitle'), data.subtitle);
 
-        // player_count now fetched from server status API, skip CMS override
+        // player_count now fetched from players API, skip CMS override
 
         if (data.features && data.features.length) {
             const container = $('.hero-features');
@@ -384,40 +384,320 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- Fetch server online status from API (via PHP proxy to avoid CORS) ---
-    function fetchServerStatus() {
-        const statusDot = $('.status-dot');
-        const statusContainer = $('.status-text');
+    // --- Fetch online player count for hero status ---
+    function updateOnlineCount() {
         const statusText = $('.highlight-green');
+        if (!statusText) return;
 
-        if (siteMode === 'netease') {
-            if (statusContainer) {
-                statusContainer.textContent = '';
-                statusContainer.append('最多可支持 ');
-                const span = document.createElement('span');
-                span.className = 'highlight-green';
-                span.textContent = neteaseTierCap;
-                statusContainer.appendChild(span);
-                statusContainer.append(' 名玩家');
-            }
-            return;
-        }
-
-        if (statusText) statusText.textContent = '加载中...';
-        fetch('server_status.php')
+        fetch('players.php')
             .then(function(r) { return r.ok ? r.json() : null; })
             .then(function(res) {
-                if (res && res.success && res.data) {
-                    const count = res.data.p;
-                    if (statusText) statusText.textContent = count;
+                if (res && res.success && res.players && Array.isArray(res.players)) {
+                    const onlinePlayers = res.players.filter(function(p) { return p.isOnline; });
+                    statusText.textContent = '在线 (' + onlinePlayers.length + ')';
                 } else {
-                    if (statusText) statusText.textContent = '离线';
-                    if (statusDot) statusDot.style.backgroundColor = '#ef4444';
+                    statusText.textContent = '在线';
                 }
             })
             .catch(function() {
-                if (statusText) statusText.textContent = '离线';
-                if (statusDot) { statusDot.style.backgroundColor = '#ef4444'; statusDot.style.boxShadow = '0 0 10px #ef4444'; }
+                statusText.textContent = '在线';
+            });
+    }
+
+    // --- Fetch players list from API (via PHP proxy) ---
+    function fetchPlayers() {
+        const playersGrid = document.getElementById('playersGrid');
+        if (!playersGrid) return;
+
+        fetch('players.php')
+            .then(function(r) { return r.ok ? r.json() : null; })
+            .then(function(res) {
+                if (!res || !res.success || !res.players || !Array.isArray(res.players)) {
+                    playersGrid.innerHTML = '<div class="players-loading">暂无玩家数据</div>';
+                    return;
+                }
+
+                const players = res.players;
+                if (players.length === 0) {
+                    playersGrid.innerHTML = '<div class="players-loading">当前没有玩家在线</div>';
+                    return;
+                }
+
+                let html = '';
+                for (let i = 0; i < players.length; i++) {
+                    const p = players[i];
+                    const onlineClass = p.isOnline ? 'online' : 'offline';
+                    const onlineText = p.isOnline ? '在线' : '离线';
+
+                    // Use minotar with player name for avatar (fast & reliable)
+                    const avatarUrl = 'https://minotar.net/avatar/' + encodeURIComponent(p.name) + '/48';
+
+                    let gamemodeText = p.gamemode || 'survival';
+                    const gamemodeMap = { adventure: '冒险', creative: '创造', survival: '生存', spectator: '旁观' };
+                    gamemodeText = gamemodeMap[gamemodeText] || gamemodeText;
+
+                    let banHtml = '';
+                    if (p.isBanned) {
+                        banHtml = '<div class="player-ban-badge">封禁</div>';
+                        if (p.banReason) {
+                            banHtml += '<div class="player-ban-reason">' + p.banReason + '</div>';
+                        }
+                    }
+
+                    html += '<div class="player-card">' +
+                        '<div class="player-avatar">' +
+                            '<img src="' + avatarUrl + '" alt="' + p.name + '" loading="lazy">' +
+                        '</div>' +
+                        '<div class="player-info">' +
+                            '<div class="player-name">' + p.name + '</div>' +
+                            '<div class="player-meta">' +
+                                '<span class="player-status-badge ' + onlineClass + '">' + onlineText + '</span>' +
+                                '<span class="player-gamemode-badge">' + gamemodeText + '</span>' +
+                                banHtml +
+                            '</div>' +
+                        '</div>' +
+                    '</div>';
+                }
+                playersGrid.innerHTML = html;
+
+                // Add click handlers on player avatars to open detail modal
+                const playerCards = playersGrid.querySelectorAll('.player-card');
+                for (var j = 0; j < playerCards.length; j++) {
+                    (function(card, player) {
+                        var avatar = card.querySelector('.player-avatar');
+                        if (avatar) {
+                            avatar.style.cursor = 'pointer';
+                            avatar.addEventListener('click', function(e) {
+                                e.stopPropagation();
+                                openPlayerDetail(player.uuid, player.name);
+                            });
+                        }
+                    })(playerCards[j], players[j]);
+                }
+            })
+            .catch(function() {
+                const el = document.getElementById('playersGrid');
+                if (el) el.innerHTML = '<div class="players-loading">加载失败</div>';
+            });
+    }
+
+    // --- Player Detail Modal ---
+    const playerDetailModal = document.getElementById('playerDetailModal');
+    const modalContent = document.getElementById('modalContent');
+    const modalCloseBtn = document.getElementById('modalCloseBtn');
+
+    function openPlayerDetail(uuid, name) {
+        if (!playerDetailModal || !modalContent) return;
+
+        playerDetailModal.classList.add('active');
+        modalContent.innerHTML = '<div class="modal-loading">加载中...</div>';
+
+        fetch('player_detail.php?uuid=' + encodeURIComponent(uuid))
+            .then(function(r) { return r.ok ? r.json() : null; })
+            .then(function(res) {
+                if (!res || !res.success || !res.data) {
+                    modalContent.innerHTML = '<div class="modal-loading">加载失败</div>';
+                    return;
+                }
+
+                const p = res.data;
+                const avatarUrl = 'https://minotar.net/avatar/' + encodeURIComponent(p.name) + '/80';
+                const gamemodeMap = { adventure: '冒险', creative: '创造', survival: '生存', spectator: '旁观' };
+                const gamemodeText = gamemodeMap[p.gamemode] || p.gamemode || '生存';
+                const onlineText = p.isOnline ? '在线' : '离线';
+                const onlineClass = p.isOnline ? 'online' : 'offline';
+                const bannedText = p.isBanned ? '是' : '否';
+                const bannedClass = p.isBanned ? 'banned' : 'not-banned';
+
+                var html = '<div class="modal-player-header">' +
+                    '<div class="modal-player-avatar"><img src="' + avatarUrl + '" alt="' + p.name + '"></div>' +
+                    '<div>' +
+                        '<div class="modal-player-name">' + p.name + '</div>' +
+                        '<div class="modal-player-uuid">' + p.uuid + '</div>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="modal-details">' +
+                    '<div class="modal-detail-row">' +
+                        '<span class="modal-detail-label">状态</span>' +
+                        '<span class="modal-detail-value ' + onlineClass + '">' + onlineText + '</span>' +
+                    '</div>' +
+                    '<div class="modal-detail-row">' +
+                        '<span class="modal-detail-label">游戏模式</span>' +
+                        '<span class="modal-detail-value">' + gamemodeText + '</span>' +
+                    '</div>' +
+                    '<div class="modal-detail-row">' +
+                        '<span class="modal-detail-label">封禁状态</span>' +
+                        '<span class="modal-detail-value ' + bannedClass + '">' + bannedText + '</span>' +
+                    '</div>';
+
+                if (p.isBanned && p.banReason) {
+                    html += '<div class="modal-ban-reason">封禁原因: ' + p.banReason + '</div>';
+                }
+
+                html += '</div>';
+                modalContent.innerHTML = html;
+            })
+            .catch(function() {
+                modalContent.innerHTML = '<div class="modal-loading">加载失败</div>';
+            });
+    }
+
+    function closePlayerDetail() {
+        if (playerDetailModal) {
+            playerDetailModal.classList.remove('active');
+        }
+    }
+
+    if (modalCloseBtn) {
+        modalCloseBtn.addEventListener('click', closePlayerDetail);
+    }
+    if (playerDetailModal) {
+        playerDetailModal.addEventListener('click', function(e) {
+            if (e.target === playerDetailModal) {
+                closePlayerDetail();
+            }
+        });
+    }
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closePlayerDetail();
+        }
+    });
+
+    // --- Fetch plugins list ---
+    function fetchPlugins() {
+        const pluginsGrid = document.getElementById('pluginsGrid');
+        if (!pluginsGrid) return;
+
+        fetch('plugins.php')
+            .then(function(r) { return r.ok ? r.json() : null; })
+            .then(function(res) {
+                if (!res || !res.success || !res.plugins || !Array.isArray(res.plugins)) {
+                    pluginsGrid.innerHTML = '<div class="players-loading">暂无插件数据</div>';
+                    return;
+                }
+
+                const plugins = res.plugins;
+                if (plugins.length === 0) {
+                    pluginsGrid.innerHTML = '<div class="players-loading">当前没有插件</div>';
+                    return;
+                }
+
+                var html = '';
+                for (var i = 0; i < plugins.length; i++) {
+                    var pl = plugins[i];
+                    var enabledClass = pl.enabled ? 'enabled' : 'disabled';
+                    var enabledText = pl.enabled ? '已启用' : '已禁用';
+                    var loadedText = pl.loaded ? '已加载' : '未加载';
+
+                    var sizeStr = '';
+                    if (pl.size != null) {
+                        if (pl.size < 1024) {
+                            sizeStr = pl.size + ' B';
+                        } else if (pl.size < 1024 * 1024) {
+                            sizeStr = (pl.size / 1024).toFixed(1) + ' KB';
+                        } else {
+                            sizeStr = (pl.size / 1024 / 1024).toFixed(2) + ' MB';
+                        }
+                    }
+
+                    var authorsStr = '';
+                    if (pl.authors && pl.authors.length > 0) {
+                        authorsStr = pl.authors.join(', ');
+                    }
+
+                    var websiteHtml = '';
+                    if (pl.website) {
+                        websiteHtml = '<a href="' + pl.website + '" target="_blank" rel="noopener noreferrer" class="plugin-website">访问网站</a>';
+                    }
+
+                    html += '<div class="plugin-card">' +
+                        '<div class="plugin-header">' +
+                            '<div class="plugin-name">' + (pl.name || pl.fileName) + '</div>' +
+                            (pl.version ? '<div class="plugin-version">v' + pl.version + '</div>' : '') +
+                        '</div>' +
+                        (pl.description ? '<div class="plugin-description">' + pl.description + '</div>' : '') +
+                        (authorsStr ? '<div class="plugin-authors">作者: <span>' + authorsStr + '</span></div>' : '') +
+                        '<div class="plugin-meta">' +
+                            '<span class="plugin-status-badge ' + enabledClass + '">' + enabledText + '</span>' +
+                            '<span class="plugin-status-badge ' + (pl.loaded ? 'enabled' : 'disabled') + '">' + loadedText + '</span>' +
+                            (sizeStr ? '<span class="plugin-size">' + sizeStr + '</span>' : '') +
+                            websiteHtml +
+                        '</div>' +
+                    '</div>';
+                }
+                pluginsGrid.innerHTML = html;
+            })
+            .catch(function() {
+                var el = document.getElementById('pluginsGrid');
+                if (el) el.innerHTML = '<div class="players-loading">加载失败</div>';
+            });
+    }
+
+    // --- Fetch monitor data ---
+    function fetchMonitor() {
+        const monitorGrid = document.getElementById('monitorGrid');
+        if (!monitorGrid) return;
+
+        fetch('monitor.php')
+            .then(function(r) { return r.ok ? r.json() : null; })
+            .then(function(res) {
+                if (!res || !res.success || !res.data) {
+                    monitorGrid.innerHTML = '<div class="players-loading">暂无监控数据</div>';
+                    return;
+                }
+
+                var d = res.data;
+
+                function getBarClass(val) {
+                    if (val < 50) return 'green';
+                    if (val < 80) return 'yellow';
+                    return 'red';
+                }
+
+                var cpuVal = d.cpu != null ? d.cpu : 0;
+                var memVal = d.memory != null ? d.memory : 0;
+                var tpsVal = d.tps != null ? d.tps : 0;
+
+                // TPS color: green >= 19, yellow >= 15, red < 15
+                var tpsBarClass = 'green';
+                if (tpsVal < 15) tpsBarClass = 'red';
+                else if (tpsVal < 19) tpsBarClass = 'yellow';
+
+                // TPS percentage for bar (max 20)
+                var tpsPercent = Math.min(100, (tpsVal / 20) * 100);
+
+                var html =
+                    '<div class="monitor-card">' +
+                        '<div class="monitor-card-icon">' +
+                            '<svg viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9H15V15H9V9Z"/></svg>' +
+                        '</div>' +
+                        '<div class="monitor-card-label">CPU 使用率</div>' +
+                        '<div class="monitor-card-value">' + cpuVal.toFixed(1) + '<span class="monitor-card-unit">%</span></div>' +
+                        '<div class="monitor-card-bar"><div class="monitor-card-bar-fill ' + getBarClass(cpuVal) + '" style="width:' + cpuVal + '%"></div></div>' +
+                    '</div>' +
+                    '<div class="monitor-card">' +
+                        '<div class="monitor-card-icon">' +
+                            '<svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 12H20"/><path d="M12 4V20"/></svg>' +
+                        '</div>' +
+                        '<div class="monitor-card-label">内存使用率</div>' +
+                        '<div class="monitor-card-value">' + memVal.toFixed(1) + '<span class="monitor-card-unit">%</span></div>' +
+                        '<div class="monitor-card-bar"><div class="monitor-card-bar-fill ' + getBarClass(memVal) + '" style="width:' + memVal + '%"></div></div>' +
+                    '</div>' +
+                    '<div class="monitor-card">' +
+                        '<div class="monitor-card-icon">' +
+                            '<svg viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6V12L16 14"/></svg>' +
+                        '</div>' +
+                        '<div class="monitor-card-label">TPS</div>' +
+                        '<div class="monitor-card-value">' + tpsVal.toFixed(1) + '<span class="monitor-card-unit">/20</span></div>' +
+                        '<div class="monitor-card-bar"><div class="monitor-card-bar-fill ' + tpsBarClass + '" style="width:' + tpsPercent + '%"></div></div>' +
+                    '</div>';
+
+                monitorGrid.innerHTML = html;
+            })
+            .catch(function() {
+                var el = document.getElementById('monitorGrid');
+                if (el) el.innerHTML = '<div class="players-loading">加载失败</div>';
             });
     }
 
@@ -435,9 +715,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.team)      applyTeamData(data.team);
             if (data.community) applyCommunityData(data.community);
             if (data.footer)    applyFooterData(data.footer);
-            fetchServerStatus();
+            updateOnlineCount();
+            fetchPlayers();
         })
         .catch(() => {});
+
+    // Fetch plugins and monitor data (independent of CMS)
+    fetchPlugins();
+    fetchMonitor();
 
     // --- Team Carousel: clone cards for seamless loop ---
     const teamWrapper = document.getElementById('teamWrapper');

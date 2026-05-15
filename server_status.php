@@ -1,3 +1,44 @@
 <?php
-/* 作者QQ：2769544753，盗卖全家被奸杀出门撞&rdquo;大运&ldquo; */
- goto JBoyeebilY; rxwgqEyPpV: tQXqJbsoSg: $apiUrl = "\150\x74\x74\x70\163\x3a\x2f\x2f\x77\167\167\56\155\151\x6e\x65\x63\162\x61\146\164\163\x65\x72\x76\x65\x72\x73\56\143\156\57\141\x70\151\x2f\161\165\x65\x72\171\x3f\x69\160\x3d" . urlencode($serverIP); $ch = curl_init($apiUrl); curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 8, CURLOPT_CONNECTTIMEOUT => 5, CURLOPT_SSL_VERIFYPEER => true, CURLOPT_USERAGENT => "\106\157\x78\x4d\x43\x2d\123\x65\162\x76\145\x72\123\164\x61\x74\165\x73\57\61\56\x30"]); $response = curl_exec($ch); goto A0kDSBm2DA; yf1xeHmt9I: exit; Iuz9iAr5wy: $data = json_decode($response, true); if (!(!$data || !isset($data["\x73\165\x63\143\145\163\163"]))) { goto bvShRIJdKL; } echo json_encode(["\x73\x75\143\x63\x65\163\163" => false, "\155\x65\x73\x73\x61\x67\x65" => "\xe6\x97\240\xe6\225\210\xe7\232\204\101\120\111\xe5\x93\215\xe5\272\224"]); goto Uy9Vh_WLBy; Uy9Vh_WLBy: exit; bvShRIJdKL: goto pwFIK0_7SX; A0kDSBm2DA: $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE); $error = curl_error($ch); curl_close($ch); if (!($response === false || $httpCode !== 200)) { goto Iuz9iAr5wy; } echo json_encode(["\x73\165\x63\x63\145\163\163" => false, "\x6d\145\x73\163\x61\147\145" => "\346\x9f\xa5\350\257\xa2\xe5\244\261\xe8\xb4\245\x3a\x20" . ($error ?: "\110\124\124\120\x20" . $httpCode)]); goto yf1xeHmt9I; SthJRtly4n: $content = file_exists($contentFile) ? json_decode(file_get_contents($contentFile), true) : []; $serverIP = $content["\163\151\164\145"]["\163\x65\x72\x76\145\162\x5f\x69\160"] ?? ''; if ($serverIP) { goto tQXqJbsoSg; } echo json_encode(["\x73\165\x63\x63\x65\163\x73" => false, "\x6d\x65\x73\163\141\x67\145" => "\346\234\xaa\xe9\x85\x8d\347\275\256\xe6\x9c\215\xe5\212\xa1\345\231\xa8\111\120"]); exit; goto rxwgqEyPpV; JBoyeebilY: require_once __DIR__ . "\57\141\x64\155\x69\x6e\x2f\143\157\x6e\x66\x69\147\x2e\160\x68\160"; header("\x43\x6f\x6e\x74\x65\156\164\x2d\124\171\x70\x65\x3a\x20\x61\x70\160\154\x69\x63\x61\164\x69\157\x6e\x2f\152\x73\157\x6e"); header("\130\x2d\x43\x6f\156\164\145\156\x74\55\124\x79\160\145\55\x4f\x70\x74\x69\157\x6e\x73\x3a\40\156\x6f\163\x6e\x69\146\x66"); $settings = loadSettings(); $contentFile = __DIR__ . "\57\141\x64\155\x69\x6e\x2f\x64\141\164\x61\57\143\157\156\164\x65\x6e\x74\x2e\152\163\x6f\x6e"; goto SthJRtly4n; pwFIK0_7SX: echo $response;
+// 代理调用 oPanel API 获取服务器信息
+require_once __DIR__ . '/admin/config.php';
+header('Content-Type: application/json');
+header('X-Content-Type-Options: nosniff');
+
+$apiUrl = 'http://39.97.183.32:30000/open-api/info';
+
+$ch = curl_init($apiUrl);
+curl_setopt_array($ch, [
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_TIMEOUT => 10,
+    CURLOPT_CONNECTTIMEOUT => 5,
+    CURLOPT_SSL_VERIFYPEER => false,
+    CURLOPT_USERAGENT => 'MC-web-ServerStatus/1.0',
+]);
+
+$response = curl_exec($ch);
+$httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+$error = curl_error($ch);
+curl_close($ch);
+
+if ($response === false || $httpCode !== 200) {
+    echo json_encode([
+        'success' => false,
+        'message' => '查询失败: ' . ($error ?: 'HTTP ' . $httpCode)
+    ]);
+    exit;
+}
+
+$data = json_decode($response, true);
+if (!$data) {
+    echo json_encode([
+        'success' => false,
+        'message' => '无效的API响应'
+    ]);
+    exit;
+}
+
+// 包装为前端友好的格式
+echo json_encode([
+    'success' => true,
+    'data' => $data
+]);
