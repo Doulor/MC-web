@@ -10,10 +10,12 @@
  */
 
 const OPANEL_BASE = 'http://mc-web-api.doulor.cn:30000';
-// 使用域名 firef.cc.cd:22225，但通过 resolveOverride 直接解析到 IP 13.75.68.60，
-// 这样既可正确设置 Host 头，又能绕过 Cloudflare 代理循环
-const MAP_BASE = 'http://firef.cc.cd:22225';
-const MAP_IP = '13.75.68.60';
+// 地图服务器配置
+// firef.cc.cd:22225 托管于 Azure，解析到 13.75.68.60
+// 注意：如果 firef.cc.cd 开启了 Cloudflare 代理（橙色云），Worker 无法通过域名直连
+// 备选方案：使用 IP 地址直接访问 (http://13.75.68.60:22225) 并设置 Host 头
+// 当前使用域名，需要确保 firef.cc.cd:22225 未经过 Cloudflare 代理
+const MAP_BASE = 'http://13.75.68.60:22225';
 const MAP_DOMAIN = 'firef.cc.cd:22225';
 
 const ROUTES = {
@@ -136,9 +138,8 @@ async function proxyMapRequest(request, mapUrl) {
     const timeoutId = setTimeout(() => controller.abort(), 15000);
 
     // 转发请求到地图服务器，保留原始请求头（如 Accept-Encoding）
-    // 使用 resolveOverride 强制 DNS 解析到指定 IP，绕过 Cloudflare 代理循环
-    // 同时保留域名作为 Host 头，使地图服务器能正确识别虚拟主机
-    const fetchOptions = {
+    // 使用 IP 地址直接访问，并设置正确的 Host 头，避免 Cloudflare 代理循环
+    const response = await fetch(mapUrl, {
       method: request.method,
       headers: {
         'User-Agent': 'MC-web-Worker-Map-Proxy/1.0',
@@ -149,14 +150,7 @@ async function proxyMapRequest(request, mapUrl) {
         'Host': MAP_DOMAIN
       },
       signal: controller.signal
-    };
-
-    // resolveOverride 强制 Worker 将域名解析到指定 IP，绕过 Cloudflare 的 DNS 代理
-    if (MAP_IP) {
-      fetchOptions.cf = { resolveOverride: MAP_IP };
-    }
-
-    const response = await fetch(mapUrl, fetchOptions);
+    });
 
     clearTimeout(timeoutId);
 
