@@ -16,7 +16,9 @@ const OPANEL_BASE = 'http://mc-web-api.doulor.cn:30000';
 // 备选方案：使用 IP 地址直接访问 (http://13.75.68.60:22225) 并设置 Host 头
 // 当前使用域名，需要确保 firef.cc.cd:22225 未经过 Cloudflare 代理
 const MAP_BASE = 'http://13.75.68.60:22225';
-const MAP_DOMAIN = 'firef.cc.cd:22225';
+// Use the hostname (without port) for the Host header. If your frp/http routing requires the port in Host,
+// you can change this to 'firef.cc.cd:22225'.
+const MAP_DOMAIN = 'firef.cc.cd';
 
 const ROUTES = {
   '/players.php': {
