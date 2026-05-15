@@ -8,7 +8,7 @@
  * 4. 其他请求正常返回静态文件
  */
 
-const OPANEL_BASE = 'http://39.97.183.32:30000';
+const OPANEL_BASE = 'http://mcwebapi.doulor.cn:30000';
 
 const ROUTES = {
   '/players.php': {
