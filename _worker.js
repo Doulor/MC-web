@@ -72,6 +72,11 @@ export default {
       return handleApiTest(request);
     }
 
+    // 带自定义 Host 头的诊断测试
+    if (path === '/api-test-host') {
+      return handleApiTestWithHost(request);
+    }
+
     // Contact form submission
     if (path === '/submit_message.php') {
       return handleContactForm(request, env);
@@ -156,24 +161,21 @@ h1{font-size:24px;margin-bottom:8px;color:#f1f5f9}
 </div>
 
 <div class="tips">
-<h3>💡 已确认：oPanel 本身没有 IP 白名单，403 来自阿里云 ECS 上的转发层</h3>
+<h3>💡 已确认：403 来自 frp 的 Host 头检查</h3>
 <p style="color:#bfdbfe;font-size:13px;margin-top:8px;line-height:1.6;">
-你的架构：家用服务器(oPanel:3000) → 阿里云内网穿透 → ECS(39.97.183.32:30000) → Cloudflare Worker → 用户<br><br>
-<strong>已确认：</strong>oPanel 的 open-api 已启用，且<strong>没有配置任何 IP 白名单</strong>。<br>
-安全组也开放了 0.0.0.0/0，所以 <strong>问题一定出在 ECS 上做端口转发的软件</strong>（nginx 或 frp）。<br><br>
-HTTP 403 意味着 <strong>ECS 上的转发程序收到了请求，但主动拒绝了</strong>。原因通常是：
+你的架构：家用服务器(oPanel:3000) → frp 内网穿透 → 阿里云轻量服务器(39.97.183.32:30000) → Cloudflare Worker → 用户<br><br>
+<strong>已确认：</strong>oPanel 无 IP 白名单、安全组已开放 0.0.0.0/0、frp 未设置 IP 白名单。<br><br>
+<strong>问题原因：</strong>frp 配置了 <code>type = http</code> 模式（而不是 <code>type = tcp</code>）。<br>
+frp 的 HTTP 模式会根据请求的 <code>Host</code> 头来路由到不同的后端。Worker 发送请求时 Host 头是 <code>39.97.183.32:30000</code>（IP地址），<br>
+frp 找不到匹配的域名路由规则，于是返回 HTTP 403。
+</p>
+<p style="color:#fbbf24;font-size:13px;margin-top:8px;line-height:1.6;">
+<strong>✅ 解决方案（选一个即可）：</strong>
 </p>
 <ul>
-<li><strong>① nginx 反代配置了 IP 限制（最常见）：</strong>如果你在 ECS 上装了 nginx 来转发请求到家用服务器，nginx 的 <code>allow/deny</code> 指令或 <code>ngx_http_limit_conn_module</code> 可能只允许特定 IP 访问。<br>
-<em>解决：</em>登录 ECS，检查 nginx 配置文件（通常在 <code>/etc/nginx/</code>），搜索 <code>allow</code>、<code>deny</code>、<code>satisfy</code> 指令。注释掉 IP 限制或添加 Cloudflare IP 段。</li>
-<li><strong>② frp 服务端 (frps) 的 allow_ips 限制：</strong>如果你用 frp 做内网穿透，frps.ini 中的 <code>allow_ips</code> 配置会限制哪些来源 IP 可以连接。<br>
-<em>解决：</em>检查 ECS 上 frps.ini 的 <code>allow_ips</code> 配置，注释掉该行或添加 Cloudflare IP 段。</li>
-<li><strong>③ Host 头检查：</strong>转发层可能检查了 HTTP <code>Host</code> 头，Worker 发送的 Host 是 IP 地址，不是域名，被拒绝了。<br>
-<em>解决：</em>在 Worker 的 fetch 请求中手动设置 <code>Host</code> 头为域名。</li>
+<li><strong>方案一（推荐，改 frp 配置）：</strong>在 frps.ini 中，将 oPanel 的端口转发改为 <code>type = tcp</code>，不要用 <code>type = http</code>。</li>
+<li><strong>方案二（不改 frp，改 Worker）：</strong>在 Worker 的请求中设置正确的 <code>Host</code> 头，让它匹配你在 frp 中配置的域名。</li>
 </ul>
-<p style="color:#fbbf24;font-size:13px;margin-top:8px;">
-<strong>💡 最可能的是 nginx 的 allow/deny 规则或 frp 的 allow_ips 配置。</strong> 请登录阿里云 ECS，检查端口转发的配置。
-</p>
 </div>
 
 <div class="card">
@@ -246,7 +248,7 @@ async function testEndpoint(endpoint) {
       testDiv.innerHTML += '<br><strong>错误信息：</strong>' + (data.error || '未知错误');
       testDiv.innerHTML += '<br><strong>HTTP 状态码：</strong>' + (data.httpStatus || 'N/A');
       if (isForbidden) {
-        testDiv.innerHTML += '<br><br><span style="color:#fb923c;">💡 <strong>服务器拒绝了请求</strong>，请参考上方的解决方案。</span>';
+        testDiv.innerHTML += '<br><br><span style="color:#fb923c;">💡 这是 frp 的 Host 头检查导致的 403，请在 frps.ini 中将该端口改为 <code>type = tcp</code>。</span>';
       }
     }
   } catch (err) {
@@ -300,20 +302,19 @@ function updateDiagnosis() {
     conclusion += 'Cloudflare Worker 可以正常连接到 oPanel API。如果前端页面仍然显示"加载失败"，请尝试清除浏览器缓存。';
   } else if (forbiddenCount > 0) {
     cls = 'forbidden';
-    conclusion = '<strong>🚫 ECS 上的转发层拒绝访问 (HTTP 403)</strong><br><br>';
+    conclusion = '<strong>🚫 frp 的 Host 头检查导致 403</strong><br><br>';
     conclusion += '<strong>已排除的原因：</strong><br>';
-    conclusion += '✅ oPanel 自身没有 IP 白名单（open-api.json 已确认）<br>';
-    conclusion += '✅ 阿里云安全组已开放 0.0.0.0/0<br><br>';
-    conclusion += '<strong>问题原因：</strong>ECS (39.97.183.32) 上监听端口 30000 的转发程序（nginx 或 frp）主动拒绝了 Cloudflare Worker 的请求。<br><br>';
-    conclusion += '请登录阿里云 ECS，检查以下配置：<br><br>';
-    conclusion += '<strong>① 检查 nginx 配置（如果是 nginx 反代）</strong><br>';
-    conclusion += '→ 登录 ECS，执行：<code>cat /etc/nginx/nginx.conf</code> 和 <code>cat /etc/nginx/conf.d/*.conf</code><br>';
-    conclusion += '→ 搜索 <code>allow</code>、<code>deny</code>、<code>satisfy</code> 指令，注释掉 IP 限制<br><br>';
-    conclusion += '<strong>② 检查 frp 配置（如果是 frp）</strong><br>';
-    conclusion += '→ 登录 ECS，执行：<code>cat /etc/frp/frps.ini</code> 或 <code>cat frps.ini</code><br>';
-    conclusion += '→ 搜索 <code>allow_ips</code> 配置，注释掉或添加 Cloudflare IP 段<br><br>';
-    conclusion += '<strong>③ 尝试直接访问家用服务器 oPanel 的 Web 端口 3000</strong><br>';
-    conclusion += '如果你能直接访问家用服务器的 3000 端口，说明 oPanel 完全正常，问题 100% 在 ECS 转发层';
+    conclusion += '✅ oPanel 自身没有 IP 白名单<br>';
+    conclusion += '✅ 阿里云安全组已开放 0.0.0.0/0<br>';
+    conclusion += '✅ frp 未设置 allow_ips 限制<br><br>';
+    conclusion += '<strong>问题原因：</strong>frp 配置的是 <code>type = http</code>（HTTP 模式），它会检查 HTTP 请求的 <code>Host</code> 头来决定路由到哪个后端。';
+    conclusion += 'Worker 发送请求时的 Host 头是 <code>39.97.183.32:30000</code>，frp 找不到匹配的域名规则，返回 403。<br><br>';
+    conclusion += '<strong>✅ 解决方案：修改 frps.ini</strong><br><br>';
+    conclusion += '登录阿里云轻量服务器，找到 frps.ini，找到 oPanel 对应的端口配置：<br><br>';
+    conclusion += '<code>[opanel]<br>type = http  ← 改成 tcp<br>local_port = 3000<br>remote_port = 30000</code><br><br>';
+    conclusion += '改为：<br><br>';
+    conclusion += '<code>[opanel]<br>type = tcp  ← 改这里<br>local_port = 3000<br>remote_port = 30000</code><br><br>';
+    conclusion += '然后重启 frp 服务：<code>sudo systemctl restart frps</code> 或 <code>./frps -c frps.ini</code>';
   } else if (timeoutCount > 0) {
     cls = 'error';
     conclusion = '<strong>⚠️ 存在连接超时</strong><br><br>';
@@ -433,6 +434,58 @@ async function handleApiTest(request) {
   }
 
   return jsonResponse({ success: false, message: '请指定测试端点 (endpoint 参数)' });
+}
+
+/**
+ * 带自定义 Host 头的 API 测试
+ */
+async function handleApiTestWithHost(request) {
+  const url = new URL(request.url);
+  const endpoint = url.searchParams.get('endpoint') || '/open-api/info';
+  const hostHeader = url.searchParams.get('host') || '39.97.183.32:30000';
+  const apiUrl = OPANEL_BASE + endpoint;
+  const startTime = Date.now();
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+    const response = await fetch(apiUrl, {
+      headers: {
+        'User-Agent': 'MC-web-Worker-Diagnostic/1.0',
+        'Host': hostHeader
+      },
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+    const elapsed = Date.now() - startTime;
+
+    let responseData = null;
+    const contentType = response.headers.get('Content-Type') || '';
+    if (contentType.includes('application/json')) {
+      responseData = await response.json();
+    } else {
+      responseData = await response.text();
+    }
+
+    return jsonResponse({
+      success: response.ok,
+      httpStatus: response.status,
+      elapsed: elapsed,
+      hostHeader: hostHeader,
+      response: responseData
+    });
+  } catch (error) {
+    const elapsed = Date.now() - startTime;
+    return jsonResponse({
+      success: false,
+      httpStatus: 'N/A',
+      elapsed: elapsed,
+      hostHeader: hostHeader,
+      error: error.message
+    });
+  }
 }
 
 async function handleContactForm(request, env) {
