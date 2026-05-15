@@ -10,21 +10,7 @@
  */
 
 const OPANEL_BASE = 'http://mc-web-api.doulor.cn:30000';
-// 地图服务器配置
-// firef.cc.cd:22225 托管于 Azure，解析到 13.75.68.60
-// 注意：如果 firef.cc.cd 开启了 Cloudflare 代理（橙色云），Worker 无法通过域名直连
-// 备选方案：使用 IP 地址直接访问 (http://13.75.68.60:22225) 并设置 Host 头
-// 当前使用域名，需要确保 firef.cc.cd:22225 未经过 Cloudflare 代理
-const MAP_BASE = 'http://13.75.68.60:22225';
-// If you create a DNS-only A record (example: origin.firef.cc.cd -> 13.75.68.60) and do NOT enable Cloudflare
-// proxy for that record (DNS-only / gray cloud), set MAP_ORIGIN_DNS to that hostname. The worker will then
-// use that hostname in the Host header when fetching the origin, avoiding Cloudflare's proxy checks (error 1003).
-// Example: MAP_ORIGIN_DNS = 'origin.firef.cc.cd';
-const MAP_ORIGIN_DNS = 'origin.firef.cc.cd';
-
-// Use the hostname (with port if required) for the Host header when necessary. MAP_DOMAIN is the public
-// domain name you might have used for the map (can be proxied). MAP_ORIGIN_DNS takes precedence if set.
-const MAP_DOMAIN = 'firef.cc.cd:22225';
+// 地图代理配置已移除（所有地图相关代理逻辑已清理）。
 
 const ROUTES = {
   '/players.php': {
