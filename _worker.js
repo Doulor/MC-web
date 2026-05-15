@@ -62,12 +62,12 @@ export default {
       });
     }
 
-    // ============ 诊断工具 ============
+    // 诊断工具
     if (path === '/debug' || path === '/debug.html') {
       return handleDebugPage(request);
     }
 
-    // ============ API 诊断测试端点 ============
+    // API 诊断测试端点
     if (path === '/api-test') {
       return handleApiTest(request);
     }
@@ -99,7 +99,6 @@ export default {
 
 /**
  * 诊断页面 - HTML
- * 用于排查 Cloudflare Worker 连接 oPanel API 的问题
  */
 async function handleDebugPage(request) {
   const html = `<!DOCTYPE html>
@@ -109,88 +108,92 @@ async function handleDebugPage(request) {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>oPanel API 连接诊断</title>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; padding: 20px; }
-  .container { max-width: 800px; margin: 0 auto; }
-  h1 { font-size: 24px; margin-bottom: 8px; color: #f1f5f9; }
-  .subtitle { color: #94a3b8; margin-bottom: 24px; font-size: 14px; }
-  .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 20px; margin-bottom: 16px; }
-  .card h2 { font-size: 16px; margin-bottom: 12px; color: #60a5fa; }
-  .info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #334155; font-size: 13px; }
-  .info-row:last-child { border-bottom: none; }
-  .info-label { color: #94a3b8; }
-  .info-value { color: #e2e8f0; font-family: monospace; }
-  .btn { background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 14px; margin: 4px; }
-  .btn:hover { background: #2563eb; }
-  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-  .btn-danger { background: #ef4444; }
-  .btn-danger:hover { background: #dc2626; }
-  .result-box { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 12px; margin-top: 12px; font-family: monospace; font-size: 12px; white-space: pre-wrap; word-break: break-all; max-height: 300px; overflow-y: auto; }
-  .result-box.success { border-color: #22c55e; }
-  .result-box.error { border-color: #ef4444; }
-  .result-box.timeout { border-color: #eab308; }
-  .status-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; }
-  .status-badge.ok { background: #166534; color: #86efac; }
-  .status-badge.fail { background: #7f1d1d; color: #fca5a5; }
-  .status-badge.warn { background: #713f12; color: #fcd34d; }
-  .summary { margin-top: 16px; padding: 12px; border-radius: 8px; font-size: 14px; }
-  .summary.error { background: #7f1d1d; border: 1px solid #ef4444; color: #fca5a5; }
-  .summary.success { background: #166534; border: 1px solid #22c55e; color: #86efac; }
-  .summary.info { background: #1e3a5f; border: 1px solid #3b82f6; color: #93c5fd; }
-  .loading { display: inline-block; width: 16px; height: 16px; border: 2px solid #334155; border-top-color: #3b82f6; border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 8px; vertical-align: middle; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .tips { background: #1e3a5f; border: 1px solid #3b82f6; border-radius: 8px; padding: 16px; margin-bottom: 16px; font-size: 13px; line-height: 1.6; }
-  .tips h3 { color: #60a5fa; margin-bottom: 8px; font-size: 14px; }
-  .tips li { margin-bottom: 4px; color: #bfdbfe; }
-  .footer-text { text-align: center; color: #475569; font-size: 12px; margin-top: 24px; }
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0f172a;color:#e2e8f0;padding:20px}
+.container{max-width:800px;margin:0 auto}
+h1{font-size:24px;margin-bottom:8px;color:#f1f5f9}
+.subtitle{color:#94a3b8;margin-bottom:24px;font-size:14px}
+.card{background:#1e293b;border:1px solid #334155;border-radius:12px;padding:20px;margin-bottom:16px}
+.card h2{font-size:16px;margin-bottom:12px;color:#60a5fa}
+.info-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #334155;font-size:13px}
+.info-row:last-child{border-bottom:none}
+.info-label{color:#94a3b8}
+.info-value{color:#e2e8f0;font-family:monospace}
+.btn{background:#3b82f6;color:white;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-size:14px;margin:4px}
+.btn:hover{background:#2563eb}
+.btn:disabled{opacity:0.5;cursor:not-allowed}
+.btn-danger{background:#ef4444}
+.btn-danger:hover{background:#dc2626}
+.result-box{background:#0f172a;border:1px solid #334155;border-radius:8px;padding:12px;margin-top:12px;font-family:monospace;font-size:12px;white-space:pre-wrap;word-break:break-all;max-height:300px;overflow-y:auto}
+.result-box.success{border-color:#22c55e}
+.result-box.error{border-color:#ef4444}
+.result-box.forbidden{border-color:#f97316}
+.status-badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:bold}
+.status-badge.ok{background:#166534;color:#86efac}
+.status-badge.fail{background:#7f1d1d;color:#fca5a5}
+.status-badge.warn{background:#713f12;color:#fcd34d}
+.summary{margin-top:16px;padding:12px;border-radius:8px;font-size:14px}
+.summary.error{background:#7f1d1d;border:1px solid #ef4444;color:#fca5a5}
+.summary.success{background:#166534;border:1px solid #22c55e;color:#86efac}
+.summary.info{background:#1e3a5f;border:1px solid #3b82f6;color:#93c5fd}
+.summary.forbidden{background:#7c2d12;border:1px solid #ea580c;color:#fdba74}
+.loading{display:inline-block;width:16px;height:16px;border:2px solid #334155;border-top-color:#3b82f6;border-radius:50%;animation:spin 0.8s linear infinite;margin-right:8px;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+.tips{background:#1e3a5f;border:1px solid #3b82f6;border-radius:8px;padding:16px;margin-bottom:16px;font-size:13px;line-height:1.6}
+.tips h3{color:#60a5fa;margin-bottom:8px;font-size:14px}
+.tips li{margin-bottom:4px;color:#bfdbfe}
+.footer-text{text-align:center;color:#475569;font-size:12px;margin-top:24px}
 </style>
 </head>
 <body>
 <div class="container">
-  <h1>🔍 oPanel API 连接诊断</h1>
-  <p class="subtitle">诊断 Cloudflare Worker 到 oPanel 服务器 (39.97.183.32:30000) 的连接状况</p>
+<h1>🔍 oPanel API 连接诊断</h1>
+<p class="subtitle">诊断 Cloudflare Worker 到 oPanel 服务器 (39.97.183.32:30000) 的连接状况</p>
 
-  <div class="card">
-    <h2>📋 诊断信息</h2>
-    <div id="envInfo"></div>
-  </div>
+<div class="card">
+<h2>📋 诊断信息</h2>
+<div id="envInfo"></div>
+</div>
 
-  <div class="tips">
-    <h3>💡 常见问题及解决方案</h3>
-    <ul>
-      <li><strong>连接超时 (Timeout)</strong>：oPanel 服务器的防火墙/安全组可能阻止了 Cloudflare 的 IP 地址。需要将 <a href="https://www.cloudflare.com/ips/" target="_blank" style="color:#60a5fa;">Cloudflare IP 范围</a> 添加到 oPanel 服务器的防火墙白名单。</li>
-      <li><strong>连接被拒绝 (Connection refused)</strong>：oPanel 服务没有运行，或者端口 30000 仅监听在内网接口上。</li>
-      <li><strong>DNS 解析失败</strong>：oPanel 服务器地址无法解析（但使用 IP 地址一般不会出现此问题）。</li>
-      <li><strong>HTTP 状态码错误</strong>：能连接到服务器但 API 返回了非 200 的响应。</li>
-    </ul>
-  </div>
+<div class="tips">
+<h3>💡 已检测到问题：服务器返回 <strong style="color:#fb923c;">HTTP 403 Forbidden</strong></h3>
+<p style="color:#bfdbfe;font-size:13px;margin-top:8px;line-height:1.6;">
+你的 oPanel 服务器 <strong>可以连通</strong>（响应时间正常），但服务器<strong>主动拒绝了</strong>来自 Cloudflare 的请求。<br><br>
+<strong>最可能的原因：</strong>oPanel 服务（或服务器防火墙）配置了 <strong>IP 白名单</strong>，只允许特定 IP 地址访问。你本地的 IP 可以访问，但 Cloudflare Worker 的出口 IP 不在白名单中。<br><br>
+<strong>解决方案：</strong>
+</p>
+<ul>
+<li><strong>方案一（推荐）：</strong>在 oPanel 服务器（或服务器防火墙/安全组）中，将 <a href="https://www.cloudflare.com/ips/" target="_blank" style="color:#60a5fa;">Cloudflare IP 范围</a> 添加到白名单。</li>
+<li><strong>方案二：</strong>在 oPanel 的配置文件中，找到 IP 白名单设置，添加 Cloudflare 的 IP 段。</li>
+<li><strong>方案三：</strong>如果 oPanel 不支持 IP 白名单配置，可以暂时关闭 IP 限制，或使用 Cloudflare Tunnel 替代直接连接。</li>
+</ul>
+</div>
 
-  <div class="card">
-    <h2>🧪 运行诊断测试</h2>
-    <p style="font-size:13px;color:#94a3b8;margin-bottom:12px;">点击下方按钮测试各 API 端点，观察能否从 Cloudflare 网络连接到 oPanel 服务器。</p>
-    <div>
-      <button class="btn" onclick="testAll()" id="testAllBtn">🔄 测试全部端点</button>
-    </div>
-    <div style="margin-top:12px;" id="testButtons">
-      <button class="btn" onclick="testEndpoint('/open-api/info')" data-ep="info">📊 服务器信息</button>
-      <button class="btn" onclick="testEndpoint('/open-api/players')" data-ep="players">👥 玩家列表</button>
-      <button class="btn" onclick="testEndpoint('/open-api/plugins')" data-ep="plugins">🔌 插件列表</button>
-      <button class="btn" onclick="testEndpoint('/open-api/monitor')" data-ep="monitor">📈 性能监控</button>
-      <button class="btn btn-danger" onclick="testEndpoint('/nonexistent')" data-ep="404">❌ 测试404</button>
-    </div>
-    <div id="testResults"></div>
-  </div>
+<div class="card">
+<h2>🧪 运行诊断测试</h2>
+<p style="font-size:13px;color:#94a3b8;margin-bottom:12px;">点击下方按钮测试各 API 端点。</p>
+<div>
+<button class="btn" onclick="testAll()" id="testAllBtn">🔄 测试全部端点</button>
+</div>
+<div style="margin-top:12px" id="testButtons">
+<button class="btn" onclick="testEndpoint('/open-api/info')">📊 服务器信息</button>
+<button class="btn" onclick="testEndpoint('/open-api/players')">👥 玩家列表</button>
+<button class="btn" onclick="testEndpoint('/open-api/plugins')">🔌 插件列表</button>
+<button class="btn" onclick="testEndpoint('/open-api/monitor')">📈 性能监控</button>
+<button class="btn btn-danger" onclick="testEndpoint('/nonexistent')">❌ 测试404</button>
+</div>
+<div id="testResults"></div>
+</div>
 
-  <div class="card">
-    <h2>📝 总体诊断结论</h2>
-    <div id="diagnosisResult">
-      <p style="color:#94a3b8;font-size:13px;">运行诊断测试后，这里会显示诊断结论和解决建议。</p>
-    </div>
-  </div>
+<div class="card">
+<h2>📝 诊断结论</h2>
+<div id="diagnosisResult">
+<p style="color:#94a3b8;font-size:13px;">运行诊断测试后，这里会显示诊断结论。</p>
+</div>
+</div>
 </div>
 
 <script>
-// 加载环境信息
 async function loadEnvInfo() {
   const res = await fetch('/api-test?type=env');
   const data = await res.json();
@@ -202,42 +205,41 @@ async function loadEnvInfo() {
     { label: '测试时间', value: data.timestamp },
     { label: '请求 IP', value: data.clientIp || '未知' }
   ];
-  rows.forEach(r => {
+  rows.forEach(function(r) {
     el.innerHTML += '<div class="info-row"><span class="info-label">' + r.label + '</span><span class="info-value">' + r.value + '</span></div>';
   });
 }
 
-// 测试单个端点
 async function testEndpoint(endpoint) {
-  const btns = document.querySelectorAll('#testButtons .btn');
-  btns.forEach(b => b.disabled = true);
+  var btns = document.querySelectorAll('#testButtons .btn');
+  btns.forEach(function(b) { b.disabled = true; });
 
-  const resultsEl = document.getElementById('testResults');
-  const testDiv = document.createElement('div');
+  var resultsEl = document.getElementById('testResults');
+  var testDiv = document.createElement('div');
   testDiv.className = 'result-box';
   testDiv.innerHTML = '<span class="loading"></span> 正在测试 <strong>' + endpoint + '</strong>...';
   resultsEl.prepend(testDiv);
 
   try {
-    const startTime = Date.now();
-    const res = await fetch('/api-test?endpoint=' + encodeURIComponent(endpoint));
-    const elapsed = Date.now() - startTime;
-    const data = await res.json();
+    var startTime = Date.now();
+    var res = await fetch('/api-test?endpoint=' + encodeURIComponent(endpoint));
+    var elapsed = Date.now() - startTime;
+    var data = await res.json();
 
     if (data.success) {
       testDiv.className = 'result-box success';
       testDiv.innerHTML = '<span class="status-badge ok">✅ 成功</span> <strong>' + endpoint + '</strong> (' + elapsed + 'ms)<br><br>';
       testDiv.innerHTML += JSON.stringify(data.response, null, 2);
     } else {
-      const cls = data.errorType === 'timeout' ? 'timeout' : 'error';
+      var isForbidden = data.httpStatus === 403 || (data.error && data.error.indexOf('403') !== -1);
+      var cls = isForbidden ? 'forbidden' : 'error';
       testDiv.className = 'result-box ' + cls;
-      const badge = data.errorType === 'timeout' ? '⏱️ 超时' : '❌ 失败';
+      var badge = isForbidden ? '🚫 403 拒绝' : '❌ 失败';
       testDiv.innerHTML = '<span class="status-badge fail">' + badge + '</span> <strong>' + endpoint + '</strong> (' + elapsed + 'ms)<br>';
       testDiv.innerHTML += '<br><strong>错误信息：</strong>' + (data.error || '未知错误');
-      testDiv.innerHTML += '<br><strong>错误类型：</strong>' + (data.errorType || 'unknown');
       testDiv.innerHTML += '<br><strong>HTTP 状态码：</strong>' + (data.httpStatus || 'N/A');
-      if (data.errorDetails) {
-        testDiv.innerHTML += '<br><br><strong>详细错误：</strong><br>' + data.errorDetails;
+      if (isForbidden) {
+        testDiv.innerHTML += '<br><br><span style="color:#fb923c;">💡 <strong>服务器拒绝了请求</strong>，请参考上方的解决方案。</span>';
       }
     }
   } catch (err) {
@@ -246,69 +248,67 @@ async function testEndpoint(endpoint) {
     testDiv.innerHTML += '<br><strong>错误：</strong>' + err.message;
   }
 
-  btns.forEach(b => b.disabled = false);
+  btns.forEach(function(b) { b.disabled = false; });
   updateDiagnosis();
 }
 
-// 测试所有端点
 async function testAll() {
-  const btn = document.getElementById('testAllBtn');
+  var btn = document.getElementById('testAllBtn');
   btn.disabled = true;
   btn.textContent = '⏳ 测试中...';
 
-  const endpoints = ['/open-api/info', '/open-api/players', '/open-api/plugins', '/open-api/monitor'];
-  for (const ep of endpoints) {
-    await testEndpoint(ep);
+  var endpoints = ['/open-api/info', '/open-api/players', '/open-api/plugins', '/open-api/monitor'];
+  for (var i = 0; i < endpoints.length; i++) {
+    await testEndpoint(endpoints[i]);
   }
 
   btn.disabled = false;
   btn.textContent = '🔄 测试全部端点';
 }
 
-// 更新诊断结论
 function updateDiagnosis() {
-  const resultBoxes = document.querySelectorAll('.result-box');
-  let successCount = 0;
-  let failCount = 0;
-  let timeoutCount = 0;
-  let anyError = false;
+  var resultBoxes = document.querySelectorAll('.result-box');
+  var successCount = 0;
+  var failCount = 0;
+  var timeoutCount = 0;
+  var forbiddenCount = 0;
 
-  resultBoxes.forEach(box => {
+  resultBoxes.forEach(function(box) {
     if (box.classList.contains('success')) successCount++;
     else if (box.classList.contains('timeout')) timeoutCount++;
+    else if (box.classList.contains('forbidden')) forbiddenCount++;
     else if (box.classList.contains('error')) failCount++;
   });
 
-  const el = document.getElementById('diagnosisResult');
-  const total = successCount + failCount + timeoutCount;
-
+  var el = document.getElementById('diagnosisResult');
+  var total = successCount + failCount + timeoutCount + forbiddenCount;
   if (total === 0) return;
 
-  let conclusion = '';
-  let cls = 'info';
+  var conclusion = '';
+  var cls = 'info';
 
   if (successCount === total) {
     cls = 'success';
     conclusion = '<strong>✅ 所有端点连接正常！</strong><br><br>';
-    conclusion += '这说明 Cloudflare Worker 可以正常连接到 oPanel API (39.97.183.32:30000)。<br>';
-    conclusion += '如果前端页面仍然显示"加载失败"，可能是以下原因：<br>';
-    conclusion += '1. 浏览器端缓存问题，请尝试清除缓存或强制刷新 (Ctrl+F5)<br>';
-    conclusion += '2. Cloudflare Pages 的部署尚未完全生效，请等待几分钟<br>';
-    conclusion += '3. 检查 _headers 文件是否配置正确（CORS 相关）';
+    conclusion += 'Cloudflare Worker 可以正常连接到 oPanel API。如果前端页面仍然显示"加载失败"，请尝试清除浏览器缓存。';
+  } else if (forbiddenCount > 0) {
+    cls = 'forbidden';
+    conclusion = '<strong>🚫 所有请求被服务器拒绝访问 (HTTP 403)</strong><br><br>';
+    conclusion += '<strong>问题原因：</strong>oPanel 服务器拒绝了来自 Cloudflare Worker 的请求。这通常是因为 oPanel 服务器配置了 <strong>IP 白名单</strong>，只允许特定 IP 地址访问。';
+    conclusion += '<br><br><strong>解决步骤：</strong><br>';
+    conclusion += '1. 登录到 oPanel 服务器（通过 SSH 或服务器管理面板）<br>';
+    conclusion += '2. 找到 oPanel 的配置文件，通常位于 oPanel 安装目录下<br>';
+    conclusion += '3. 查找 IP 白名单配置项<br>';
+    conclusion += '4. 添加 Cloudflare 的 IP 范围：<a href="https://www.cloudflare.com/ips/" target="_blank" style="color:#60a5fa;">https://www.cloudflare.com/ips/</a><br><br>';
+    conclusion += '如果找不到 IP 白名单配置，请检查服务器防火墙（如 iptables、firewalld）或云服务商的安全组设置。';
   } else if (timeoutCount > 0) {
     cls = 'error';
-    conclusion = '<strong>⚠️ 存在连接超时！这是最常见的问题。</strong><br><br>';
-    conclusion += 'oPanel 服务器 (39.97.183.32) 的防火墙可能 <strong>阻止了 Cloudflare 的 IP 地址</strong>。<br><br>';
-    conclusion += '<strong>解决方案：</strong><br>';
-    conclusion += '1. 登录到你的 oPanel 服务器（或云服务商控制台）<br>';
-    conclusion += '2. 在防火墙/安全组中放行 <a href="https://www.cloudflare.com/ips/" target="_blank" style="color:#60a5fa;">Cloudflare IP 范围</a> 对 TCP 端口 30000 的访问<br>';
-    conclusion += '3. 或者将端口 30000 完全开放（不推荐，有安全风险）<br><br>';
-    conclusion += '如果无法修改防火墙，可以考虑使用 Cloudflare Tunnel 替代。';
+    conclusion = '<strong>⚠️ 存在连接超时</strong><br><br>';
+    conclusion += '无法连接到 oPanel 服务器，请检查服务器是否在线。';
   } else if (failCount > 0) {
     cls = 'warn';
-    conclusion = '<strong>⚠️ 部分端点连接失败</strong><br><br>';
-    conclusion += 'Worker 可以连接到服务器，但某些端点返回了错误。请查看具体错误信息。<br>';
-    conclusion += '可能的原因：oPanel API 某些接口需要认证，或者请求格式不正确。';
+    conclusion = '<strong>⚠️ 部分端点连接失败</strong>';
+    conclusion += '请查看具体错误信息。';
   }
 
   el.innerHTML = '<div class="summary ' + cls + '">' + conclusion + '</div>';
@@ -330,14 +330,13 @@ loadEnvInfo();
 }
 
 /**
- * API 测试端点 - 用于诊断工具
+ * API 测试端点
  */
 async function handleApiTest(request) {
   const url = new URL(request.url);
   const type = url.searchParams.get('type');
   const endpoint = url.searchParams.get('endpoint');
 
-  // 环境信息
   if (type === 'env') {
     const colo = request.cf && request.cf.colo ? request.cf.colo : '未知';
     const clientIp = request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For') || '未知';
@@ -349,14 +348,13 @@ async function handleApiTest(request) {
     });
   }
 
-  // 测试指定端点
   if (endpoint) {
     const apiUrl = OPANEL_BASE + endpoint;
     const startTime = Date.now();
 
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒超时
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
 
       const response = await fetch(apiUrl, {
         headers: { 'User-Agent': 'MC-web-Worker-Diagnostic/1.0' },
@@ -473,7 +471,6 @@ async function handleContactForm(request, env) {
     };
     const subjectLabel = subjectMap[subject] || subject;
 
-    // Collect uploaded images
     const attachments = [];
     const allowedMime = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
     const maxSize = 5 * 1024 * 1024;
@@ -502,7 +499,6 @@ async function handleContactForm(request, env) {
       imageHtml = '<p><strong>附件图片：</strong>' + imageCount + ' 张</p>';
     }
 
-    // Build email HTML - use string concatenation to avoid entity encoding issues
     const escName = escapeHtml(name);
     const escEmail = escapeHtml(email);
     const escSubject = escapeHtml(subjectLabel);
@@ -529,7 +525,6 @@ async function handleContactForm(request, env) {
       + '<p style="color: #9ca3af; font-size: 12px; text-align: center;">此邮件由 MC-web 服务器联系表单自动发送</p>'
       + '</div></div>';
 
-    // Send via Resend API
     const senderDomain = contactEmail.split('@')[1] || 'yourdomain.com';
     const resendPayload = {
       from: 'MC-web 联系表单 <noreply@' + senderDomain + '>',
@@ -572,16 +567,13 @@ async function handleContactForm(request, env) {
   }
 }
 
-/**
- * HTML escape function using Unicode escapes to prevent auto-formatter corruption
- */
 function escapeHtml(str) {
   return String(str)
-    .replace(/\x26/g, '\x26\x61\x6d\x70\x3b')   // & -> &
-    .replace(/\x3c/g, '\x26\x6c\x74\x3b')        // < -> <
-    .replace(/\x3e/g, '\x26\x67\x74\x3b')        // > -> >
-    .replace(/\x22/g, '\x26\x71\x75\x6f\x74\x3b') // " -> "
-    .replace(/\x27/g, '\x26\x23\x30\x33\x39\x3b'); // ' -> &#039;
+    .replace(/&/g, '&')
+    .replace(/</g, '<')
+    .replace(/>/g, '>')
+    .replace(/"/g, '"')
+    .replace(/'/g, '&#039;');
 }
 
 async function handlePlayerDetail(request, url) {
@@ -650,7 +642,8 @@ async function handleApiProxy(request, route) {
   }
 }
 
-function jsonResponse(data, status = 200) {
+function jsonResponse(data, status) {
+  if (status === undefined) status = 200;
   return new Response(JSON.stringify(data), {
     status: status,
     headers: {
