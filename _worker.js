@@ -16,8 +16,14 @@ const OPANEL_BASE = 'http://mc-web-api.doulor.cn:30000';
 // 备选方案：使用 IP 地址直接访问 (http://13.75.68.60:22225) 并设置 Host 头
 // 当前使用域名，需要确保 firef.cc.cd:22225 未经过 Cloudflare 代理
 const MAP_BASE = 'http://13.75.68.60:22225';
-// Use the hostname (with port if required) for the Host header. For frp/http routing that expects the port
-// include it here (common cause of 403). We set the port-included host so the origin/frp will accept the request.
+// If you create a DNS-only A record (example: origin.firef.cc.cd -> 13.75.68.60) and do NOT enable Cloudflare
+// proxy for that record (DNS-only / gray cloud), set MAP_ORIGIN_DNS to that hostname. The worker will then
+// use that hostname in the Host header when fetching the origin, avoiding Cloudflare's proxy checks (error 1003).
+// Example: MAP_ORIGIN_DNS = 'origin.firef.cc.cd';
+const MAP_ORIGIN_DNS = '';
+
+// Use the hostname (with port if required) for the Host header when necessary. MAP_DOMAIN is the public
+// domain name you might have used for the map (can be proxied). MAP_ORIGIN_DNS takes precedence if set.
 const MAP_DOMAIN = 'firef.cc.cd:22225';
 
 const ROUTES = {
@@ -142,7 +148,9 @@ async function proxyMapRequest(request, mapUrl) {
     // 转发请求到地图服务器，保留原始请求头（如 Accept-Encoding）
     // 使用 IP 地址直接访问。为了避免 Cloudflare 对被代理域名的直接访问返回 1003，
     // 我们在 Host 头中使用 MAP_BASE 的 host（通常为 IP:port），而不是 MAP_DOMAIN（可能是被 Cloudflare 代理的域）。
-    const originHost = (new URL(MAP_BASE)).host;
+  // Determine Host header: prefer MAP_ORIGIN_DNS (a DNS-only hostname you create),
+  // otherwise fall back to MAP_BASE host (IP:port) to avoid Cloudflare loop issues.
+  const originHost = MAP_ORIGIN_DNS ? MAP_ORIGIN_DNS : (new URL(MAP_BASE)).host;
     const forwardedHeaders = {
       'User-Agent': 'MC-web-Worker-Map-Proxy/1.0',
       'Accept': request.headers.get('Accept') || '*/*',
