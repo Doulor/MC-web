@@ -156,22 +156,23 @@ h1{font-size:24px;margin-bottom:8px;color:#f1f5f9}
 </div>
 
 <div class="tips">
-<h3>💡 已检测到问题：HTTP 403 - 应用层拒绝访问</h3>
+<h3>💡 已确认：oPanel 本身没有 IP 白名单，403 来自阿里云 ECS 上的转发层</h3>
 <p style="color:#bfdbfe;font-size:13px;margin-top:8px;line-height:1.6;">
-你的架构是：家用服务器(oPanel) → 阿里云内网穿透 → ECS(39.97.183.32:30000) → Cloudflare Worker → 用户<br><br>
-你已经将 ECS 安全组端口 30000 的入方向开放给 <strong>0.0.0.0/0</strong>，所以 <strong>不是阿里云安全组拦截的</strong>。<br><br>
-HTTP 403 意味着 <strong>TCP 连接已经建立成功</strong>（端口是通的），但是 <strong>HTTP 应用层主动拒绝了请求</strong>。问题出在以下环节之一：
+你的架构：家用服务器(oPanel:3000) → 阿里云内网穿透 → ECS(39.97.183.32:30000) → Cloudflare Worker → 用户<br><br>
+<strong>已确认：</strong>oPanel 的 open-api 已启用，且<strong>没有配置任何 IP 白名单</strong>。<br>
+安全组也开放了 0.0.0.0/0，所以 <strong>问题一定出在 ECS 上做端口转发的软件</strong>（nginx 或 frp）。<br><br>
+HTTP 403 意味着 <strong>ECS 上的转发程序收到了请求，但主动拒绝了</strong>。原因通常是：
 </p>
 <ul>
-<li><strong>① oPanel 自带的 IP 白名单（最常见）：</strong>oPanel 有内置的安全机制，只允许配置过的 IP 访问 open-api。你本机能访问，但 Cloudflare Worker 的出口 IP 不在白名单中。<br>
-<em>解决：</em>在 oPanel 配置文件中找到 <code>open-api-whitelist</code> 或 <code>api-ip-whitelist</code> 设置，添加 Cloudflare IP 段或关掉 IP 限制。</li>
-<li><strong>② frp 服务端配置了白名单：</strong>如果你在 ECS 上用 frp 做穿透，frps.ini 中的 <code>allow_ips</code> 配置会限制来源 IP。<br>
-<em>解决：</em>检查 frps.ini，注释掉 <code>allow_ips</code> 或添加 Cloudflare IP 段。</li>
-<li><strong>③ 家用服务器的防火墙或 nginx 反向代理：</strong>如果你在家用服务器上用了 nginx/apache 反代 oPanel，它们可能有 IP 限制。<br>
-<em>解决：</em>检查 nginx 配置中的 <code>allow/deny</code> 指令。</li>
+<li><strong>① nginx 反代配置了 IP 限制（最常见）：</strong>如果你在 ECS 上装了 nginx 来转发请求到家用服务器，nginx 的 <code>allow/deny</code> 指令或 <code>ngx_http_limit_conn_module</code> 可能只允许特定 IP 访问。<br>
+<em>解决：</em>登录 ECS，检查 nginx 配置文件（通常在 <code>/etc/nginx/</code>），搜索 <code>allow</code>、<code>deny</code>、<code>satisfy</code> 指令。注释掉 IP 限制或添加 Cloudflare IP 段。</li>
+<li><strong>② frp 服务端 (frps) 的 allow_ips 限制：</strong>如果你用 frp 做内网穿透，frps.ini 中的 <code>allow_ips</code> 配置会限制哪些来源 IP 可以连接。<br>
+<em>解决：</em>检查 ECS 上 frps.ini 的 <code>allow_ips</code> 配置，注释掉该行或添加 Cloudflare IP 段。</li>
+<li><strong>③ Host 头检查：</strong>转发层可能检查了 HTTP <code>Host</code> 头，Worker 发送的 Host 是 IP 地址，不是域名，被拒绝了。<br>
+<em>解决：</em>在 Worker 的 fetch 请求中手动设置 <code>Host</code> 头为域名。</li>
 </ul>
 <p style="color:#fbbf24;font-size:13px;margin-top:8px;">
-<strong>💡 大概率是 oPanel 自身的 IP 白名单在拦截。</strong> 请登录 oPanel 后台，找到 API 安全设置，查看 open-api 的 IP 白名单配置。
+<strong>💡 最可能的是 nginx 的 allow/deny 规则或 frp 的 allow_ips 配置。</strong> 请登录阿里云 ECS，检查端口转发的配置。
 </p>
 </div>
 
@@ -299,17 +300,20 @@ function updateDiagnosis() {
     conclusion += 'Cloudflare Worker 可以正常连接到 oPanel API。如果前端页面仍然显示"加载失败"，请尝试清除浏览器缓存。';
   } else if (forbiddenCount > 0) {
     cls = 'forbidden';
-    conclusion = '<strong>🚫 服务器返回 HTTP 403 - 应用层拒绝访问</strong><br><br>';
-    conclusion += '<strong>问题原因：</strong>端口是通的（TCP 连接已建立），但 HTTP 应用层主动拒绝了 Cloudflare Worker 的请求。';
-    conclusion += '这通常是以下原因之一：<br><br>';
-    conclusion += '<strong>① oPanel 自身的 IP 白名单（最常见）</strong><br>';
-    conclusion += 'oPanel 内置了 open-api 的安全限制，只允许白名单内的 IP 访问。Cloudflare Worker 的出口 IP 不在白名单中。<br>';
-    conclusion += '→ <strong>解决方法：</strong>登录 oPanel 后台 → 安全设置 → 找到 open-api 白名单 → 添加 Cloudflare IP 范围 或 关闭白名单限制<br><br>';
-    conclusion += '<strong>② frp 服务端（frps.ini）的 allow_ips 限制</strong><br>';
-    conclusion += '→ 检查 frps.ini 中的 <code>allow_ips</code> 配置，注释掉或添加 Cloudflare IP 段<br><br>';
-    conclusion += '<strong>③ 家用服务器上 nginx/apache 反向代理的 IP 限制</strong><br>';
-    conclusion += '→ 检查 nginx 配置中的 <code>allow/deny</code> 指令<br><br>';
-    conclusion += '<strong>推荐方案：</strong>改用 Cloudflare Tunnel（cloudflared），在家用服务器直接建立隧道，无需阿里云穿透，无 IP 白名单问题';
+    conclusion = '<strong>🚫 ECS 上的转发层拒绝访问 (HTTP 403)</strong><br><br>';
+    conclusion += '<strong>已排除的原因：</strong><br>';
+    conclusion += '✅ oPanel 自身没有 IP 白名单（open-api.json 已确认）<br>';
+    conclusion += '✅ 阿里云安全组已开放 0.0.0.0/0<br><br>';
+    conclusion += '<strong>问题原因：</strong>ECS (39.97.183.32) 上监听端口 30000 的转发程序（nginx 或 frp）主动拒绝了 Cloudflare Worker 的请求。<br><br>';
+    conclusion += '请登录阿里云 ECS，检查以下配置：<br><br>';
+    conclusion += '<strong>① 检查 nginx 配置（如果是 nginx 反代）</strong><br>';
+    conclusion += '→ 登录 ECS，执行：<code>cat /etc/nginx/nginx.conf</code> 和 <code>cat /etc/nginx/conf.d/*.conf</code><br>';
+    conclusion += '→ 搜索 <code>allow</code>、<code>deny</code>、<code>satisfy</code> 指令，注释掉 IP 限制<br><br>';
+    conclusion += '<strong>② 检查 frp 配置（如果是 frp）</strong><br>';
+    conclusion += '→ 登录 ECS，执行：<code>cat /etc/frp/frps.ini</code> 或 <code>cat frps.ini</code><br>';
+    conclusion += '→ 搜索 <code>allow_ips</code> 配置，注释掉或添加 Cloudflare IP 段<br><br>';
+    conclusion += '<strong>③ 尝试直接访问家用服务器 oPanel 的 Web 端口 3000</strong><br>';
+    conclusion += '如果你能直接访问家用服务器的 3000 端口，说明 oPanel 完全正常，问题 100% 在 ECS 转发层';
   } else if (timeoutCount > 0) {
     cls = 'error';
     conclusion = '<strong>⚠️ 存在连接超时</strong><br><br>';
