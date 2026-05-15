@@ -418,6 +418,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 const players = res.players;
+                // 排序：在线玩家排前面，离线玩家排后面
+                players.sort(function(a, b) {
+                    if (a.isOnline && !b.isOnline) return -1;
+                    if (!a.isOnline && b.isOnline) return 1;
+                    return 0;
+                });
                 if (players.length === 0) {
                     playersGrid.innerHTML = '<div class="players-loading">当前没有玩家在线</div>';
                     return;
