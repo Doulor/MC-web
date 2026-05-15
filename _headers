@@ -1,0 +1,16 @@
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: SAMEORIGIN
+  Referrer-Policy: strict-origin-when-cross-origin
+
+# API routes need CORS
+/players.php
+  Access-Control-Allow-Origin: *
+/plugins.php
+  Access-Control-Allow-Origin: *
+/monitor.php
+  Access-Control-Allow-Origin: *
+/server_status.php
+  Access-Control-Allow-Origin: *
+/player_detail.php
+  Access-Control-Allow-Origin: *
