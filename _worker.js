@@ -156,18 +156,23 @@ h1{font-size:24px;margin-bottom:8px;color:#f1f5f9}
 </div>
 
 <div class="tips">
-<h3>💡 已检测到问题：阿里云内网穿透返回 <strong style="color:#fb923c;">HTTP 403 Forbidden</strong></h3>
+<h3>💡 已检测到问题：HTTP 403 - 应用层拒绝访问</h3>
 <p style="color:#bfdbfe;font-size:13px;margin-top:8px;line-height:1.6;">
-你的架构是：家用服务器 → 阿里云内网穿透 → 公网 IP :30000 → Cloudflare Worker<br><br>
-<strong>可以连通</strong>（响应时间正常），但 <strong>阿里云内网穿透服务</strong> 主动拒绝了 Cloudflare 的请求。<br><br>
-<strong>原因：</strong>阿里云的内网穿透服务（或 ECS 安全组/ NAT 网关）有 <strong>IP 白名单 / 安全组规则</strong>，只允许特定 IP 访问 39.97.183.32:30000。你本地能访问，但 Cloudflare Worker 的出口 IP 不在允许列表中。<br><br>
-<strong>解决方案：</strong>
+你的架构是：家用服务器(oPanel) → 阿里云内网穿透 → ECS(39.97.183.32:30000) → Cloudflare Worker → 用户<br><br>
+你已经将 ECS 安全组端口 30000 的入方向开放给 <strong>0.0.0.0/0</strong>，所以 <strong>不是阿里云安全组拦截的</strong>。<br><br>
+HTTP 403 意味着 <strong>TCP 连接已经建立成功</strong>（端口是通的），但是 <strong>HTTP 应用层主动拒绝了请求</strong>。问题出在以下环节之一：
 </p>
 <ul>
-<li><strong>方案一（推荐）：</strong>登录阿里云控制台，找到<strong>安全组</strong>或<strong>NAT 网关</strong>配置，添加入方向规则，允许 <a href="https://www.cloudflare.com/ips/" target="_blank" style="color:#60a5fa;">Cloudflare IP 范围</a> 访问端口 30000。</li>
-<li><strong>方案二：</strong>如果内网穿透用的是 frp 或其他隧道工具，在 frp 服务端配置文件（frps.ini）中关闭 IP 白名单限制，或添加 Cloudflare 的 IP 段。</li>
-<li><strong>方案三（推荐）：</strong>改用 <strong>Cloudflare Tunnel</strong>（cloudflared），在家用服务器上运行 cloudflared，直接建立隧道到 Cloudflare，无需公网 IP，安全性更高且不存在白名单问题。</li>
+<li><strong>① oPanel 自带的 IP 白名单（最常见）：</strong>oPanel 有内置的安全机制，只允许配置过的 IP 访问 open-api。你本机能访问，但 Cloudflare Worker 的出口 IP 不在白名单中。<br>
+<em>解决：</em>在 oPanel 配置文件中找到 <code>open-api-whitelist</code> 或 <code>api-ip-whitelist</code> 设置，添加 Cloudflare IP 段或关掉 IP 限制。</li>
+<li><strong>② frp 服务端配置了白名单：</strong>如果你在 ECS 上用 frp 做穿透，frps.ini 中的 <code>allow_ips</code> 配置会限制来源 IP。<br>
+<em>解决：</em>检查 frps.ini，注释掉 <code>allow_ips</code> 或添加 Cloudflare IP 段。</li>
+<li><strong>③ 家用服务器的防火墙或 nginx 反向代理：</strong>如果你在家用服务器上用了 nginx/apache 反代 oPanel，它们可能有 IP 限制。<br>
+<em>解决：</em>检查 nginx 配置中的 <code>allow/deny</code> 指令。</li>
 </ul>
+<p style="color:#fbbf24;font-size:13px;margin-top:8px;">
+<strong>💡 大概率是 oPanel 自身的 IP 白名单在拦截。</strong> 请登录 oPanel 后台，找到 API 安全设置，查看 open-api 的 IP 白名单配置。
+</p>
 </div>
 
 <div class="card">
@@ -294,12 +299,17 @@ function updateDiagnosis() {
     conclusion += 'Cloudflare Worker 可以正常连接到 oPanel API。如果前端页面仍然显示"加载失败"，请尝试清除浏览器缓存。';
   } else if (forbiddenCount > 0) {
     cls = 'forbidden';
-    conclusion = '<strong>🚫 请求被阿里云内网穿透服务拒绝 (HTTP 403)</strong><br><br>';
-    conclusion += '<strong>问题原因：</strong>阿里云内网穿透（或 ECS 安全组 / NAT 网关）拒绝了来自 Cloudflare Worker 的请求。家用服务器上的 oPanel 本身可能没有 IP 限制，但阿里云侧的<strong>安全组规则</strong>或<strong>frp 服务端配置</strong>只允许特定 IP 访问端口 30000。';
-    conclusion += '<br><br><strong>解决步骤：</strong><br>';
-    conclusion += '1. <strong>如果用的是阿里云安全组：</strong>登录阿里云控制台 → 找到 ECS 实例 → 安全组 → 添加入方向规则，放行 <a href="https://www.cloudflare.com/ips/" target="_blank" style="color:#60a5fa;">Cloudflare IP 范围</a> 的端口 30000<br><br>';
-    conclusion += '2. <strong>如果用的是 frp 内网穿透：</strong>在 frp 服务端（frps.ini）中，检查是否有 <code>allow_ips</code> 或 <code>white_list</code> 配置，添加 Cloudflare IP 段，或直接注释掉该配置以允许所有来源<br><br>';
-    conclusion += '3. <strong>推荐方案：改用 Cloudflare Tunnel（cloudflared）</strong>，在家用服务器上直接运行 cloudflared 创建隧道，无需阿里云穿透，无 IP 白名单问题';
+    conclusion = '<strong>🚫 服务器返回 HTTP 403 - 应用层拒绝访问</strong><br><br>';
+    conclusion += '<strong>问题原因：</strong>端口是通的（TCP 连接已建立），但 HTTP 应用层主动拒绝了 Cloudflare Worker 的请求。';
+    conclusion += '这通常是以下原因之一：<br><br>';
+    conclusion += '<strong>① oPanel 自身的 IP 白名单（最常见）</strong><br>';
+    conclusion += 'oPanel 内置了 open-api 的安全限制，只允许白名单内的 IP 访问。Cloudflare Worker 的出口 IP 不在白名单中。<br>';
+    conclusion += '→ <strong>解决方法：</strong>登录 oPanel 后台 → 安全设置 → 找到 open-api 白名单 → 添加 Cloudflare IP 范围 或 关闭白名单限制<br><br>';
+    conclusion += '<strong>② frp 服务端（frps.ini）的 allow_ips 限制</strong><br>';
+    conclusion += '→ 检查 frps.ini 中的 <code>allow_ips</code> 配置，注释掉或添加 Cloudflare IP 段<br><br>';
+    conclusion += '<strong>③ 家用服务器上 nginx/apache 反向代理的 IP 限制</strong><br>';
+    conclusion += '→ 检查 nginx 配置中的 <code>allow/deny</code> 指令<br><br>';
+    conclusion += '<strong>推荐方案：</strong>改用 Cloudflare Tunnel（cloudflared），在家用服务器直接建立隧道，无需阿里云穿透，无 IP 白名单问题';
   } else if (timeoutCount > 0) {
     cls = 'error';
     conclusion = '<strong>⚠️ 存在连接超时</strong><br><br>';
