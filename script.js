@@ -46,6 +46,16 @@ function safeLink(el, url) {
 const $ = (sel) => document.querySelector(sel);
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Load admin settings so front-end can respect module toggles
+    window.SETTINGS = { homepage_enabled: true, homepage_sections: {}, module_visibility: {} };
+    fetch('/admin/data/settings.json')
+        .then(r => r.ok ? r.json() : null)
+        .then(cfg => {
+            if (cfg) {
+                window.SETTINGS = cfg;
+            }
+        })
+        .catch(() => { /* ignore, keep defaults */ });
     // --- Register button (moved from inline onclick) ---
     const regBtn = document.getElementById('navRegisterBtn');
     if (regBtn) regBtn.addEventListener('click', () => alert('注册功能开发中，敬请期待！'));
@@ -574,6 +584,15 @@ document.addEventListener('DOMContentLoaded', () => {
     function fetchPlugins() {
         const pluginsGrid = document.getElementById('pluginsGrid');
         if (!pluginsGrid) return;
+
+        // Respect admin settings: if homepage disabled or plugins section disabled, hide plugins
+        const cfg = window.SETTINGS || {};
+        const homepageEnabled = (cfg.homepage_enabled !== undefined) ? cfg.homepage_enabled : true;
+        const pluginsEnabled = (cfg.homepage_sections && typeof cfg.homepage_sections.plugins !== 'undefined') ? cfg.homepage_sections.plugins : ((cfg.module_visibility && typeof cfg.module_visibility.plugins !== 'undefined') ? cfg.module_visibility.plugins : true);
+        if (!homepageEnabled || !pluginsEnabled) {
+            pluginsGrid.style.display = 'none';
+            return;
+        }
 
         fetch('plugins.php')
             .then(function(r) { return r.ok ? r.json() : null; })
