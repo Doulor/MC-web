@@ -210,7 +210,7 @@ foreach ($messages as $m) {
                         </div>
                         <div class="form-group">
                             <label>服务器 IP 地址</label>
-                            <input type="text" name="site[server_ip]" value="<?= e($content['site']['server_ip'] ?? '') ?>" class="form-input" placeholder="play.example.com">
+                            <input type="text" name="site[server_ip]" value="<?= e($content['site']['server_ip'] ?? '') ?>" class="form-input" placeholder="Play.Doulor.cn">
                         </div>
                     </div>
                     <div class="form-section">

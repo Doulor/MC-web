@@ -1,4 +1,4 @@
-let serverIP = 'play.example.com';
+let serverIP = 'Play.Doulor.cn';
 let siteMode = 'international';
 let neteaseTierCap = 4;
 
