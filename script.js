@@ -47,7 +47,7 @@ const $ = (sel) => document.querySelector(sel);
 
 document.addEventListener('DOMContentLoaded', () => {
     // Load admin settings so front-end can respect module toggles
-    window.SETTINGS = { homepage_enabled: true, homepage_sections: {}, module_visibility: {} };
+    // window.SETTINGS removed: unified homepage toggle and plugin controls were removed per user request.
     fetch('/admin/data/settings.json')
         .then(r => r.ok ? r.json() : null)
         .then(cfg => {
@@ -580,84 +580,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // --- Fetch plugins list ---
-    function fetchPlugins() {
-        const pluginsGrid = document.getElementById('pluginsGrid');
-        if (!pluginsGrid) return;
-
-        // Respect admin settings: if homepage disabled or plugins section disabled, hide plugins
-        const cfg = window.SETTINGS || {};
-        const homepageEnabled = (cfg.homepage_enabled !== undefined) ? cfg.homepage_enabled : true;
-        const pluginsEnabled = (cfg.homepage_sections && typeof cfg.homepage_sections.plugins !== 'undefined') ? cfg.homepage_sections.plugins : ((cfg.module_visibility && typeof cfg.module_visibility.plugins !== 'undefined') ? cfg.module_visibility.plugins : true);
-        if (!homepageEnabled || !pluginsEnabled) {
-            pluginsGrid.style.display = 'none';
-            return;
-        }
-
-        fetch('plugins.php')
-            .then(function(r) { return r.ok ? r.json() : null; })
-            .then(function(res) {
-                if (!res || !res.success || !res.plugins || !Array.isArray(res.plugins)) {
-                    pluginsGrid.innerHTML = '<div class="players-loading">暂无插件数据</div>';
-                    return;
-                }
-
-                const plugins = res.plugins;
-                if (plugins.length === 0) {
-                    pluginsGrid.innerHTML = '<div class="players-loading">当前没有插件</div>';
-                    return;
-                }
-
-                var html = '';
-                for (var i = 0; i < plugins.length; i++) {
-                    var pl = plugins[i];
-                    var enabledClass = pl.enabled ? 'enabled' : 'disabled';
-                    var enabledText = pl.enabled ? '已启用' : '已禁用';
-                    var loadedText = pl.loaded ? '已加载' : '未加载';
-
-                    var sizeStr = '';
-                    if (pl.size != null) {
-                        if (pl.size < 1024) {
-                            sizeStr = pl.size + ' B';
-                        } else if (pl.size < 1024 * 1024) {
-                            sizeStr = (pl.size / 1024).toFixed(1) + ' KB';
-                        } else {
-                            sizeStr = (pl.size / 1024 / 1024).toFixed(2) + ' MB';
-                        }
-                    }
-
-                    var authorsStr = '';
-                    if (pl.authors && pl.authors.length > 0) {
-                        authorsStr = pl.authors.join(', ');
-                    }
-
-                    var websiteHtml = '';
-                    if (pl.website) {
-                        websiteHtml = '<a href="' + pl.website + '" target="_blank" rel="noopener noreferrer" class="plugin-website">访问网站</a>';
-                    }
-
-                    html += '<div class="plugin-card">' +
-                        '<div class="plugin-header">' +
-                            '<div class="plugin-name">' + (pl.name || pl.fileName) + '</div>' +
-                            (pl.version ? '<div class="plugin-version">v' + pl.version + '</div>' : '') +
-                        '</div>' +
-                        (pl.description ? '<div class="plugin-description">' + pl.description + '</div>' : '') +
-                        (authorsStr ? '<div class="plugin-authors">作者: <span>' + authorsStr + '</span></div>' : '') +
-                        '<div class="plugin-meta">' +
-                            '<span class="plugin-status-badge ' + enabledClass + '">' + enabledText + '</span>' +
-                            '<span class="plugin-status-badge ' + (pl.loaded ? 'enabled' : 'disabled') + '">' + loadedText + '</span>' +
-                            (sizeStr ? '<span class="plugin-size">' + sizeStr + '</span>' : '') +
-                            websiteHtml +
-                        '</div>' +
-                    '</div>';
-                }
-                pluginsGrid.innerHTML = html;
-            })
-            .catch(function() {
-                var el = document.getElementById('pluginsGrid');
-                if (el) el.innerHTML = '<div class="players-loading">加载失败</div>';
-            });
-    }
+    // Plugins removed: plugin grid and related fetching were removed per user request.
 
     // --- Fetch monitor data ---
     function fetchMonitor() {
@@ -745,8 +668,7 @@ document.addEventListener('DOMContentLoaded', () => {
         })
         .catch(() => {});
 
-    // Fetch plugins and monitor data (independent of CMS)
-    fetchPlugins();
+    // Fetch monitor data (independent of CMS)
     fetchMonitor();
 
     // --- Team Carousel: clone cards for seamless loop ---
