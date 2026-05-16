@@ -18,7 +18,7 @@ $tabs = [
     'help'       => ['label' => '加入指南',   'icon' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>'],
     'features'   => ['label' => '游戏特色',   'icon' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>'],
     'gallery'    => ['label' => '游戏截图',   'icon' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>'],
-    'team'       => ['label' => '管理团队',   'icon' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>'],
+    'team'       => ['label' => '杰出成员',   'icon' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>'],
     'monitor'    => ['label' => '实时监控', 'icon' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>'],
     'messages'   => ['label' => '消息通知',   'icon' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>'],
     'users'      => ['label' => '用户管理',   'icon' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>'],
@@ -459,7 +459,7 @@ foreach ($messages as $m) {
                     <input type="hidden" name="csrf" value="<?= e($csrf) ?>">
                     <input type="hidden" name="tab" value="team">
                     <div class="form-section">
-                        <h3 class="section-title">管理团队板块</h3>
+                        <h3 class="section-title">杰出成员板块</h3>
                         <div class="form-row">
                             <div class="form-group"><label>板块标题</label><input type="text" name="team[title]" value="<?= e($content['team']['title'] ?? '') ?>" class="form-input"></div>
                             <div class="form-group"><label>板块副标题</label><input type="text" name="team[subtitle]" value="<?= e($content['team']['subtitle'] ?? '') ?>" class="form-input"></div>
@@ -706,7 +706,7 @@ foreach ($messages as $m) {
                                     <div class="form-group"><label>发件人名称</label><input type="text" name="smtp_from_name" value="<?= e($settings['smtp_from_name'] ?? 'FoxMC Admin') ?>" class="form-input"></div>
                                 </div>
                                 <div class="form-group"><label>通知接收邮箱 (留空则发给SMTP用户)</label><input type="email" name="notification_email" value="<?= e($settings['notification_email'] ?? '') ?>" class="form-input"></div>
-                                <div class="form-group"><label>回复邮件模板 ({name}, {subject}, {reply_content} 为占位符)</label><textarea name="reply_email_template" class="form-input" rows="4"><?= e($settings['reply_email_template'] ?? "亲爱的 {name}，</br>\n\n您好！</br>\n\n我们已收到您关于「{subject}」的反馈，以下是我们的回复：</br>\n\n{reply_content}</br>\n\n如有其他问题，欢迎随时联系我们。</br>\n\n此致</br>\nFoxMC 管理团队") ?></textarea></div>
+                                <div class="form-group"><label>回复邮件模板 ({name}, {subject}, {reply_content} 为占位符)</label><textarea name="reply_email_template" class="form-input" rows="4"><?= e($settings['reply_email_template'] ?? "亲爱的 {name}，</br>\n\n您好！</br>\n\n我们已收到您关于「{subject}」的反馈，以下是我们的回复：</br>\n\n{reply_content}</br>\n\n如有其他问题，欢迎随时联系我们。</br>\n\n此致</br>\nFoxMC 杰出成员") ?></textarea></div>
                             </div>
                         </details>
                         <div class="form-actions">
