@@ -1,7 +1,26 @@
+# Cloudflare Pages 的 _headers 文件语法（不是 nginx / 不是 Apache）：
+#   - 顶格写路径，支持 * 通配；从下一行起缩进两个空格写 "Header-Name: value"
+#   - 以 # 开头的是注释
+#   - 后面的同名 header 会覆盖前面的
+# 重要：_headers 只能"往响应里加头"，它没有任何访问控制指令（没有 deny /
+# allow / return 404 —— 那些是 nginx、Apache 的语法）。真正的后台门禁写在
+# _worker.js 的 handleAdminGate() 里（对 /admin 默认返回 404）。
+
 /*
   X-Content-Type-Options: nosniff
   X-Frame-Options: SAMEORIGIN
   Referrer-Policy: strict-origin-when-cross-origin
+
+# 管理后台加固（第二道防线）：
+# 正常请求在 _worker.js 就被 404 掉了，根本到不了这里；
+# 万一哪天 worker 失效 / 被摘掉，这几行至少保证后台的 PHP 源码与
+# data/*.json 不会留在 CDN 和浏览器缓存里，也不会被搜索引擎收录。
+/admin/*
+  Cache-Control: no-store, must-revalidate
+  X-Robots-Tag: noindex, nofollow, noarchive, noimageindex
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: no-referrer
 
 # API routes need CORS
 /players.php

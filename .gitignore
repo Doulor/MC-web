@@ -1,0 +1,22 @@
+# MC-web 的仓库卫生
+#
+# 后台 admin/ 下的运行时数据不应进仓库：这个仓库是 public 的
+# （github.com/Doulor/MC-web），一旦提交就等于永久公开。
+# 详见 admin/README-SECURITY.md。
+
+# 访客留言（姓名 / 邮箱 / 正文 / 截图列表）= PII
+admin/data/messages.json
+# 登录风控与限流状态（IP + 时间戳）
+admin/data/login_attempts.json
+admin/data/rate_limit.json
+# 后台写下的锁文件与缓存（点文件）
+admin/data/.ad_lock
+admin/data/.ad_integrity_cache
+# 访客上传的截图
+admin/uploads/
+
+# 注意：下面这两个**故意没有**被忽略，因为线上 Pages 需要它们：
+#   admin/data/content.json   —— 首页 CMS 内容（本来就公开）
+#   admin/data/settings.json  —— 首页会读；其中 admin_pass_hash / smtp_* 已由
+#                                _worker.js 在响应里脱敏。长期方案是把机密字段
+#                                拆到 web root 之外，见 admin/README-SECURITY.md。

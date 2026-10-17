@@ -12,6 +12,40 @@
 const OPANEL_BASE = 'http://mc-web-api.doulor.cn:30000';
 // 地图代理配置已移除（所有地图相关代理逻辑已清理）。
 
+/* ==================================================================
+ * 管理后台（/admin）访问控制
+ *
+ * 为什么需要这段：
+ *   本仓库被 Cloudflare Pages 托管（_headers + _worker.js + 静态文件），而
+ *   Pages 不执行 PHP —— /admin/ 下的 *.php 只会被当成静态文件原样返回，
+ *   admin/data/*.json 同样是静态文件。这就是渗透报告里的
+ *   “/admin/*.php 源码泄露 + /admin/data/*.json 敏感数据泄露”。
+ *   （实证：线上 GET /admin/index.php 返回 200 + Content-Type: application/x-httpd-php，
+ *     即浏览器能直接下载 PHP 源码。）
+ *
+ * 策略：默认拒绝。
+ *   - /admin 下的一切请求，除下面两个“首页必须用到且不含机密”的数据文件外，
+ *     一律返回和普通 404 一模一样的响应。
+ *   - 故意用 404 而不是 403：403 等于明确告诉攻击者“这个路径确实存在”，
+ *     404 则和 Pages 自带的 not-found 无法区分。
+ * ================================================================== */
+
+// 首页 script.js 会 fetch('admin/data/content.json') 渲染 CMS 内容，
+// 这份数据本来就会显示在公开页面上，不含机密，必须保持可读，否则首页内容全空。
+const ADMIN_PUBLIC_CONTENT_JSON = '/admin/data/content.json';
+// 首页也会 fetch 这份设置，但它含 admin_pass_hash（管理员 bcrypt 哈希）和
+// smtp_* 凭据，所以不能原样放行 —— 走 serveSanitizedSettings() 脱敏后再返回。
+const ADMIN_SANITIZED_SETTINGS_JSON = '/admin/data/settings.json';
+
+const ADMIN_PATH_PREFIX = '/admin';
+
+// 可选：站长在 Pages 项目里配置环境变量 ADMIN_TOKEN 后，
+// 请求带上该令牌才允许读取 /admin 下的静态文件（默认不配置 = 全部 404）。
+const ADMIN_TOKEN_HEADER = 'x-admin-token';
+const ADMIN_TOKEN_QUERY = 'admin_token';
+
+/* ================================================================== */
+
 const ROUTES = {
   '/players.php': {
     apiPath: '/open-api/players',
@@ -51,6 +85,11 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const path = url.pathname;
+
+    // 管理后台门禁必须放在最前面：这样 CORS 预检、ROUTES 代理、静态资源
+    // 任何一条路径都绕不过它（漏在后面的分支都可能被当成兜底静态读取）。
+    const adminGate = await handleAdminGate(request, env, url);
+    if (adminGate) return adminGate;
 
     // CORS preflight
     if (request.method === 'OPTIONS') {
@@ -112,6 +151,207 @@ export default {
 };
 
 // proxyMapRequest removed
+
+/**
+ * 把路径规范化成“门禁判定用”的形式。
+ *
+ * 为什么不能直接比较 url.pathname：
+ *   1. Cloudflare / 浏览器可能保留百分号编码（%2e%2e%2f、%41dmin 等），
+ *      直接比较字符串会漏判；所以先反复解码（避免双重编码绕过）。
+ *   2. 解码后可能出现 ".."，必须重新折叠，防止 /admin/../admin 之类的变体。
+ *   3. 统一转小写：某些主机/自定义域按大小写不敏感匹配文件名，
+ *      /Admin/index.php 一样能拿到源码，因此门禁按“更严格”的方向判定。
+ */
+function normalizePathname(pathname) {
+  let p = pathname || '/';
+  for (let i = 0; i < 3; i++) {
+    let decoded;
+    try {
+      decoded = decodeURIComponent(p);
+    } catch (e) {
+      // 非法百分号编码，保持原样，交给后面的字符级判定
+      break;
+    }
+    if (decoded === p) break;
+    p = decoded;
+  }
+  const segs = [];
+  for (const seg of p.replace(/\\/g, '/').split('/')) {
+    if (seg === '' || seg === '.') continue;
+    if (seg === '..') {
+      segs.pop();
+      continue;
+    }
+    segs.push(seg.toLowerCase());
+  }
+  return '/' + segs.join('/');
+}
+
+/**
+ * 与 Pages 自带 404 完全一致的响应体。
+ * 每次返回新对象（Response body 只能被消费一次）。
+ */
+function notFoundResponse() {
+  return new Response('Not Found', {
+    status: 404,
+    headers: {
+      'Content-Type': 'text/plain; charset=utf-8',
+      // 别让 CDN/浏览器把一次 404 缓存住，也避免泄露缓存命中信息
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff'
+    }
+  });
+}
+
+/**
+ * 从 ASSETS 读取静态文件，并保持“不存在就当 404”的语义。
+ */
+async function assetPassthrough(request, env) {
+  try {
+    const res = await env.ASSETS.fetch(request);
+    if (!res || res.status === 404) return notFoundResponse();
+    return res;
+  } catch (e) {
+    return notFoundResponse();
+  }
+}
+
+// 需要从 settings.json 里剔除的敏感字段：
+// 口令哈希、SMTP 账号口令、以及任何名字里带 pass/secret/token/hash/credential/api_key 的键。
+const SETTINGS_SECRET_KEY_RE = /(pass|pwd|secret|token|hash|credential|api[_-]?key)/i;
+
+/**
+ * 把 settings.json 里的机密字段剥掉后再返回。
+ *
+ * 为什么要脱敏而不是整个 404：
+ *   首页 script.js 现在确实会 fetch 这个文件（当前只是存到 window.SETTINGS，
+ *   暂时没有读取方，但保留可读性可以避免未来功能被这一刀切砍掉），
+ *   而真正致命的是 admin_pass_hash（bcrypt）和 smtp_* （邮箱凭据），
+ *   把它们去掉即可，既不影响前端，也不再泄露。
+ */
+function sanitizeSettings(cfg) {
+  if (!cfg || typeof cfg !== 'object' || Array.isArray(cfg)) return {};
+  const out = {};
+  for (const key of Object.keys(cfg)) {
+    const lower = key.toLowerCase();
+    if (SETTINGS_SECRET_KEY_RE.test(lower)) continue;          // 口令/哈希/密钥类
+    if (lower.startsWith('smtp_') && lower !== 'smtp_from_name') continue; // SMTP 主机/账号/口令
+    out[key] = cfg[key];
+  }
+  return out;
+}
+
+/**
+ * 返回脱敏后的 settings.json。
+ */
+async function serveSanitizedSettings(request, env) {
+  try {
+    const settingsUrl = new URL(ADMIN_SANITIZED_SETTINGS_JSON, request.url);
+    const res = await env.ASSETS.fetch(new Request(settingsUrl.toString(), { method: 'GET' }));
+    if (!res || !res.ok) return notFoundResponse();
+
+    let cfg;
+    try {
+      cfg = await res.json();
+    } catch (e) {
+      // 文件存在但不是合法 JSON —— 宁可 404 也不要把原文吐出去
+      return notFoundResponse();
+    }
+
+    return jsonResponse(sanitizeSettings(cfg), 200, {
+      'Cache-Control': 'no-store'
+    });
+  } catch (e) {
+    return notFoundResponse();
+  }
+}
+
+/**
+ * 定长比较，避免通过响应时间猜令牌。
+ * 先各自 SHA-256 再逐字节异或累加，长度不同也不会提前 return。
+ */
+async function timingSafeEqual(a, b) {
+  const enc = new TextEncoder();
+  const [ha, hb] = await Promise.all([
+    crypto.subtle.digest('SHA-256', enc.encode(String(a))),
+    crypto.subtle.digest('SHA-256', enc.encode(String(b)))
+  ]);
+  const va = new Uint8Array(ha);
+  const vb = new Uint8Array(hb);
+  let diff = 0;
+  for (let i = 0; i < va.length; i++) diff |= va[i] ^ vb[i];
+  return diff === 0;
+}
+
+/**
+ * 是否携带了正确的管理凭据。
+ *
+ * 注意：这条路径只在站长显式配置了环境变量 ADMIN_TOKEN 时才可能为 true；
+ * 没有配置就恒为 false（默认拒绝）。即使通过校验，Pages 上也只会返回
+ * 静态文件本身 —— PHP 依然不会执行，所以它不能当“后台能用”的方案，
+ * 真正可用的后台请参考 admin/README-SECURITY.md（Access / Basic Auth）。
+ */
+async function isAdminAuthorized(request, env, url) {
+  const expected = env && env.ADMIN_TOKEN ? String(env.ADMIN_TOKEN) : '';
+  if (!expected) return false; // 未配置令牌 → 任何人都不许进
+
+  // 1) Authorization: Bearer <token>
+  const auth = request.headers.get('Authorization') || '';
+  if (auth.toLowerCase().startsWith('bearer ')) {
+    if (await timingSafeEqual(auth.slice(7).trim(), expected)) return true;
+  }
+
+  // 2) X-Admin-Token: <token>
+  const headerToken = request.headers.get(ADMIN_TOKEN_HEADER);
+  if (headerToken && (await timingSafeEqual(headerToken, expected))) return true;
+
+  // 3) ?admin_token=<token>（方便直接在浏览器里打开；比较同样定时安全）
+  const queryToken = url.searchParams.get(ADMIN_TOKEN_QUERY);
+  if (queryToken && (await timingSafeEqual(queryToken, expected))) return true;
+
+  return false;
+}
+
+/**
+ * /admin 门禁总入口。
+ * 返回 Response 表示已处理；返回 null 表示“不是 /admin，继续走后面的正常流程”。
+ */
+async function handleAdminGate(request, env, url) {
+  const norm = normalizePathname(url.pathname);
+  const isAdmin = norm === ADMIN_PATH_PREFIX || norm.startsWith(ADMIN_PATH_PREFIX + '/');
+  if (!isAdmin) return null;
+
+  // ---- 1. 公开白名单 ----
+  // 首页 CMS 内容：必须公开（本来就会渲染到页面上），但也别让它长缓存
+  if (norm === ADMIN_PUBLIC_CONTENT_JSON) {
+    const res = await assetPassthrough(request, env);
+    if (res.status === 404) return res;
+    const headers = new Headers(res.headers);
+    headers.set('Cache-Control', 'public, max-age=60');
+    headers.set('X-Content-Type-Options', 'nosniff');
+    return new Response(res.body, { status: res.status, headers });
+  }
+
+  // 首页设置：脱敏后公开
+  if (norm === ADMIN_SANITIZED_SETTINGS_JSON) {
+    return serveSanitizedSettings(request, env);
+  }
+
+  // ---- 2. 其余一切默认拒绝 ----
+  // 覆盖但不限于：
+  //   /admin/index.php、panel.php、config.php、handlers.php、save.php、smtp.php、
+  //   forgot_password.php、api.php（PHP 源码）
+  //   /admin/data/messages.json（访客姓名/邮箱/留言 —— PII）
+  //   /admin/data/login_attempts.json、rate_limit.json（登录风控状态）
+  //   /admin/data/.ad_lock、.ad_integrity_cache（点文件）
+  //   /admin/uploads/...（用户上传的截图）
+  //   /admin/（目录索引）
+  if (await isAdminAuthorized(request, env, url)) {
+    return assetPassthrough(request, env);
+  }
+  return notFoundResponse();
+}
+
 
 /**
  * 诊断页面 - HTML
@@ -772,14 +1012,18 @@ async function handleApiTestDebug(request) {
   }
 }
 
-function jsonResponse(data, status) {
+function jsonResponse(data, status, extraHeaders) {
   if (status === undefined) status = 200;
+  const headers = {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Access-Control-Allow-Origin': '*',
+    'X-Content-Type-Options': 'nosniff'
+  };
+  if (extraHeaders) {
+    for (const k of Object.keys(extraHeaders)) headers[k] = extraHeaders[k];
+  }
   return new Response(JSON.stringify(data), {
     status: status,
-    headers: {
-      'Content-Type': 'application/json; charset=utf-8',
-      'Access-Control-Allow-Origin': '*',
-      'X-Content-Type-Options': 'nosniff'
-    }
+    headers: headers
   });
 }

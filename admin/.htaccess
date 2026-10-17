@@ -1,0 +1,58 @@
+# =====================================================================
+# admin/.htaccess —— PHP 主机（Apache）侧的兜底防护
+#
+# 适用场景：
+#   mc.doulor.cn 是 Cloudflare Pages，PHP 根本不会被执行（详见 _worker.js 顶部
+#   的说明和 admin/README-SECURITY.md），Pages 那一侧的拦截已经在 _worker.js
+#   的 handleAdminGate() 里做了。但这套 admin/*.php 是给另一台"真的会跑 PHP"
+#   的主机用的，如果那台主机是 Apache，本文件就会生效；如果是 nginx，请把
+#   nginx-admin-protection.conf 里的几行贴进 server {} 块。
+#
+# 为什么返回 404 而不是 403：
+#   403 = "这里确实有东西，只是不给你看"，等于帮扫描器确认目录存在；
+#   404 与"文件根本不存在"完全一致，符合渗透报告的修复要求。
+# =====================================================================
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  # 1) data/ 是运行时数据，绝不能通过 HTTP 读到：
+  #      settings.json       => 管理员 bcrypt 口令哈希 + SMTP 账号/口令
+  #      messages.json       => 访客姓名 / 邮箱 / 留言内容（PII）
+  #      login_attempts.json => 登录风控（哪些 IP 试过多少次）
+  #      rate_limit.json、.ad_lock、.ad_integrity_cache => 风控 / 锁 / 缓存状态
+  #    这些文件只需要被 PHP 用 file_get_contents() 在本地读，不需要任何外部访问。
+  RewriteRule ^data(/|$) - [R=404,L,NC]
+
+  # 2) 只应被 require_once 引入的实现文件，禁止直接请求
+  #    （config.php 里有 session / CSRF / 口令哈希的实现细节，没有理由可枚举）
+  RewriteRule ^(config|handlers|save|smtp)\.php$ - [R=404,L,NC]
+
+  # 3) 任何点文件（本文件自身、.ad_lock 之类）
+  RewriteRule (^|/)\. - [R=404,L]
+
+  # 4) 任何 .json —— 防止以后又往 admin/ 里加数据文件时再漏一次
+  RewriteRule \.json$ - [R=404,L,NC]
+</IfModule>
+
+# 关掉目录列表（直接访问 /admin/ 或 /admin/uploads/ 时不要列出文件名，
+# uploads 里是访客上传的截图，光文件名就可能是 PII）。
+# ⚠️ 如果虚拟主机不允许 AllowOverride Options，这一条会让 /admin/ 返回 500，
+#    那就把下面这 3 行注释掉 —— 数据文件已经被上面的规则 404 掉了，
+#    目录列表只影响 uploads/。
+<IfModule mod_autoindex.c>
+  Options -Indexes
+</IfModule>
+
+# 兜底：万一 mod_rewrite 没启用，至少用 FilesMatch 挡住数据文件
+<IfModule !mod_rewrite.c>
+  <FilesMatch "\.(json|lock|cache)$">
+    <IfModule mod_authz_core.c>
+      Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+      Order allow,deny
+      Deny from all
+    </IfModule>
+  </FilesMatch>
+</IfModule>
